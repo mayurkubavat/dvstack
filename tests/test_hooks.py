@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,36 @@ def edit(path: str, old: str, new: str) -> dict:
 
 
 RTL = str(EXAMPLE / "rtl" / "fifo.sv")
+
+
+class TestNoWeakenFormal:
+    def test_removing_cover_is_blocked(self):
+        code, _, err = run_hook("no_weaken.py", edit(RTL, "c_full:  cover property (@(posedge clk) disable iff (!rst_n) full);", ""))
+        assert code == 2 and "cover property" in err
+
+    def test_unlisted_assume_is_blocked(self):
+        code, _, err = run_hook("no_weaken.py", edit(RTL, "  c_full:", "  m_x: assume property (@(posedge clk) !pop);\n  c_full:"))
+        assert code == 2 and "m_x" in err and "assumes:" in err
+
+    def test_listed_assume_is_allowed(self, tmp_path):
+        shutil.copytree(EXAMPLE, tmp_path / "p", ignore=shutil.ignore_patterns("build", "evidence"))
+        vp = tmp_path / "p" / "vplan.yaml"
+        vp.write_text(vp.read_text().replace("    faults: [FIFO_BUG_FULL_EARLY]", "    faults: [FIFO_BUG_FULL_EARLY]\n    assumes:\n      m_x: producer.a_no_pop_empty", 1))
+        ev = edit(str(tmp_path / "p" / "rtl" / "fifo.sv"), "  c_full:", "  m_x: assume property (@(posedge clk) !pop);\n  c_full:")
+        code, _, err = run_hook("no_weaken.py", ev, cwd=tmp_path / "p")
+        assert code == 0, err
+
+    def test_lowering_formal_depth_is_blocked(self):
+        code, _, err = run_hook("no_weaken.py", edit(str(EXAMPLE / "dv.toml"), "depth = 12 ", "depth = 4 "))
+        assert code == 2 and "depth" in err
+
+    def test_accept_bounded_is_blocked(self):
+        code, _, err = run_hook("no_weaken.py", edit(str(EXAMPLE / "dv.toml"), "accept_bounded = false", "accept_bounded = true"))
+        assert code == 2 and "accept_bounded" in err
+
+    def test_raising_formal_depth_is_allowed(self):
+        code, _, err = run_hook("no_weaken.py", edit(str(EXAMPLE / "dv.toml"), "depth = 12 ", "depth = 20 "))
+        assert code == 0, err
 
 
 class TestNoWeaken:

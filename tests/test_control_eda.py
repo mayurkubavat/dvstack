@@ -105,7 +105,8 @@ class TestWithVerilator:
     def test_fault_injection_must_fail(self):
         code, d = eda("sim", "--test", "tb_fifo", "--seed", "42", "--define", "FIFO_BUG_DOUBLE_POP", "--expect-fail")
         assert code == 0 and d["status"] == "fail" and d["ok"] is True, d
-        assert d["first_failure"] and "rdata" in d["first_failure"]
+        # a_ptr_count fires in simulation before the scoreboard sees bad data
+        assert d["first_failure"] and "a_ptr_count" in d["first_failure"]
 
     def test_unknown_test_names_known_ones(self):
         code, d = eda("sim", "--test", "nope", "--seed", "1")

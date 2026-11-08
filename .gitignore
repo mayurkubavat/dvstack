@@ -9,6 +9,8 @@ evidence/*.log
 evidence/cov.json
 evidence/lint.json
 evidence/worktree.json
+evidence/formal.json
+evidence/equiv.json
 evidence/.one-way-door
 
 # python

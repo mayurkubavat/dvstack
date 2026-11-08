@@ -29,6 +29,11 @@ class TestCursor:
                                           "tool_input": {"path": RTL, "old_string": "wptr <= wptr + 1'b1;", "new_string": "wptr <= wptr + AW'(1);"}})
         assert r == {"permission": "allow"}
 
+    def test_pre_tool_use_denies_cover_removal(self):
+        r = adapt("cursor", "no_weaken", {"hook_event_name": "preToolUse", "tool_name": "StrReplace", "cwd": str(EXAMPLE),
+                                          "tool_input": {"path": RTL, "old_string": "c_full:  cover property (@(posedge clk) full);", "new_string": ""}})
+        assert r["permission"] == "deny" and "cover" in r["user_message"]
+
     def test_after_file_edit_runs_lint(self, tmp_path):
         f = tmp_path / "rtl" / "x.sv"
         f.parent.mkdir()
@@ -53,6 +58,12 @@ class TestAntigravity:
         r = adapt("antigravity", "no_weaken", {"workspacePaths": [str(EXAMPLE)], "stepIdx": 3,
                                                "toolCall": {"name": "replace_file_content", "args": {"TargetFile": RTL, "TargetContent": "a_x: assert property (@(posedge clk) p);", "ReplacementContent": "a_x: assert property (@(posedge clk) disable iff (busy) p);"}}})
         assert r["decision"] == "deny" and "disable iff" in r["reason"]
+
+    def test_formal_depth_lowering_denied(self):
+        toml = str(EXAMPLE / "dv.toml")
+        r = adapt("antigravity", "no_weaken", {"workspacePaths": [str(EXAMPLE)], "stepIdx": 3,
+                                               "toolCall": {"name": "replace_file_content", "args": {"TargetFile": toml, "TargetContent": "depth = 12 ", "ReplacementContent": "depth = 2 "}}})
+        assert r["decision"] == "deny" and "depth" in r["reason"]
 
     def test_multi_replace_waiver_denied(self):
         r = adapt("antigravity", "no_weaken", {"workspacePaths": [str(EXAMPLE)], "stepIdx": 3,
@@ -108,17 +119,48 @@ class TestInstall:
         hooks = json.loads((tmp_path / ".agents" / "hooks.json").read_text())
         assert "PreToolUse" in hooks["dv-gate"] and "Stop" in hooks["dv-gate"]
 
+    def test_cursor_installs_formal_plugin(self, tmp_path):
+        r = self.run("cursor", tmp_path)
+        assert set(r["plugins"]) >= {"dv", "formal"}
+        for skill in ("sva", "prove", "refactor", "review-to-rule"):
+            assert (tmp_path / ".cursor" / "skills" / skill / "SKILL.md").exists()
+        assert (tmp_path / ".cursor" / "commands" / "formal-doctor.md").exists()
+        assert (tmp_path / ".cursor" / "rules" / "formal-gate.mdc").exists()
+
+    def test_antigravity_formal_only_still_adds_dv_hooks(self, tmp_path):
+        r = self.run("antigravity", tmp_path, "--plugins", "formal")
+        assert r["plugins"] == ["dv", "formal"]
+        assert (tmp_path / ".agents" / "skills" / "prove" / "SKILL.md").exists()
+        assert (tmp_path / ".agents" / "workflows" / "formal-doctor.md").exists()
+        assert "trigger: always_on" in (tmp_path / ".agents" / "rules" / "formal-gate.md").read_text()
+        assert (tmp_path / ".agents" / "hooks" / "dv" / "no_weaken.py").exists()
+
+    def test_unknown_plugin_is_an_error(self, tmp_path):
+        p = subprocess.run(["control-eda", "install", "--env", "cursor", "--project", str(tmp_path), "--plugins", "nope", "--json"], capture_output=True, text=True)
+        assert p.returncode != 0
+
     def test_dry_run_writes_nothing(self, tmp_path):
         r = self.run("antigravity", tmp_path, "--dry-run")
         assert r["dry_run"] and not (tmp_path / ".agents").exists() and len(r["actions"]) > 5
 
 
 def test_cursor_manifests_are_valid_json():
-    for p in (ROOT / ".cursor-plugin" / "marketplace.json", ROOT / "plugins" / "dv" / ".cursor-plugin" / "plugin.json", HOOKS / "cursor-hooks.json", HOOKS / "antigravity-hooks.json"):
+    for p in (ROOT / ".cursor-plugin" / "marketplace.json", ROOT / "plugins" / "dv" / ".cursor-plugin" / "plugin.json",
+              ROOT / "plugins" / "formal" / ".cursor-plugin" / "plugin.json", HOOKS / "cursor-hooks.json", HOOKS / "antigravity-hooks.json"):
         json.loads(p.read_text())
     m = json.loads((ROOT / ".cursor-plugin" / "marketplace.json").read_text())
     for entry in m["plugins"]:
         assert (ROOT / entry["source"] / ".cursor-plugin" / "plugin.json").exists()
+    claude = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text())
+    assert {e["name"] for e in claude["plugins"]} == {e["name"] for e in m["plugins"]} == {
+        p.name for p in (ROOT / "plugins").iterdir() if (p / ".claude-plugin" / "plugin.json").exists()}
+
+
+def test_no_command_shares_a_name_with_a_skill():
+    commands = {c.stem for c in (ROOT / "plugins").glob("*/commands/*.md")}
+    skills = [s.name for s in (ROOT / "plugins").glob("*/skills/*") if (s / "SKILL.md").exists()]
+    assert not commands & set(skills)
+    assert len(skills) == len(set(skills)), "skill names collide when installed flat into Cursor/Antigravity"
 
 
 class TestProbe:

@@ -6,7 +6,7 @@ features:
     rtl: [rtl/fifo.sv]
     tests: [tb_fifo]
     covergroups: []
-    assertions: [a_full_empty_excl, a_no_overflow]
+    assertions: [a_full_empty_excl, a_no_overflow, a_full_iff_depth, a_full_holds]
     covers: [c_full, c_push_when_full]
     faults: [FIFO_BUG_FULL_EARLY]
     door: two-way
@@ -16,8 +16,8 @@ features:
     rtl: [rtl/fifo.sv]
     tests: [tb_fifo]
     covergroups: []
-    assertions: []
-    covers: []
+    assertions: [a_ptr_count]
+    covers: [c_push_pop]
     faults: [FIFO_BUG_DOUBLE_POP]
     door: two-way
     status: written

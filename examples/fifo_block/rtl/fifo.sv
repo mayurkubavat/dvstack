@@ -55,6 +55,10 @@ module fifo #(
   // Properties. Each assert has a cover so a pass can't be vacuous.
   a_no_overflow: assert property (@(posedge clk) disable iff (!rst_n) count <= (AW+1)'(DEPTH));
   a_full_empty_excl: assert property (@(posedge clk) disable iff (!rst_n) !(full && empty));
+  a_full_iff_depth: assert property (@(posedge clk) disable iff (!rst_n) full == (count == (AW+1)'(DEPTH)));
+  a_ptr_count: assert property (@(posedge clk) disable iff (!rst_n) (wptr - rptr) == count[AW-1:0]);
+  a_full_holds: assert property (@(posedge clk) disable iff (!rst_n) full && push && !pop |=> full);
   c_full:  cover property (@(posedge clk) disable iff (!rst_n) full);
+  c_push_pop: cover property (@(posedge clk) disable iff (!rst_n) do_push && do_pop);
   c_push_when_full: cover property (@(posedge clk) disable iff (!rst_n) full && push);
 endmodule

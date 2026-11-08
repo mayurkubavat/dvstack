@@ -11,7 +11,7 @@ sources = ["rtl/fifo.sv", "tb/tb_fifo.sv"]
 seeds = [1, 42, 9137]         # fixed seeds; dropping one is a gate weakening
 random_seeds = 3              # extra fresh seeds per dv:verify run
 pass_pattern = "TEST PASSED"
-fail_pattern = "TEST FAILED|ERROR"
+fail_pattern = "TEST FAILED|ERROR|%Error|Assertion failed"
 verilator_flags = ["-Wno-fatal", "-Wno-WIDTHEXPAND", "-Wno-WIDTHTRUNC"]
 
 [lint]
@@ -21,6 +21,23 @@ flags = ["-Wall", "-Wno-fatal", "-Wno-DECLFILENAME", "-Wno-UNUSEDSIGNAL", "-Wno-
 
 [cov]
 floor = 80.0                  # percent; lowering it is a gate weakening
+
+[formal]
+# Read by `control-eda formal check`. Tools are found at run time; see `control-eda formal detect`.
+top = "fifo"
+sources = ["rtl/fifo.sv"]
+clock = "clk"                 # for properties with no clocking event
+reset = "!rst_n"              # true during reset; assumed in the first cycle
+depth = 12                    # BMC / induction depth; lowering it is a gate weakening
+backend = "auto"              # auto | sby | yosys | jasper | vcformal | questa | <custom>
+required = false              # true: dv verify is INCONCLUSIVE when no formal tool is installed
+accept_bounded = false        # true: a bounded (BMC-only) result counts as proven; a human decision
+
+[equiv]
+# Read by `control-eda equiv --base <ref>` for behavior-preserving refactors.
+top = "fifo"
+sources = ["rtl/fifo.sv"]
+backend = "auto"              # auto | eqy | yosys | conformal | formality | <custom>
 
 [tests.tb_fifo]
 top = "tb_fifo"

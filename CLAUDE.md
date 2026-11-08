@@ -12,7 +12,10 @@ repo, several plugins, one shared CLI.
 - Cursor: `.cursor-plugin/` manifests mirror `.claude-plugin/`; hooks go through `hooks/adapt.py`
   (`hooks/cursor-hooks.json`). Antigravity: `control-eda install --env antigravity`. See `docs/environments.md`.
 - `tools/control-eda/`: Python CLI every skill and hook calls. `pip install -e tools/control-eda`.
-- `schemas/`: JSON schemas for `evidence`, `vplan` and `door-policy` files.
+- `schemas/`: JSON schemas for `evidence`, `vplan`, `door-policy` and `rules` files.
+- `tools/control-eda/control_eda/formal/`: formal and equivalence backends, detected at run time.
+  Never assume a tool is installed; a missing tool is `tool_missing` / INCONCLUSIVE with an install hint.
+  `CONTROL_EDA_HIDE_TOOLS=yosys,sby` simulates a machine without them.
 - `examples/fifo_block/`: the reference project every test runs against. Has
   injectable faults (`FIFO_BUG_*`) so the gate can prove it is able to fail.
 - `tests/`: pytest for hooks and control-eda. Run `pytest -q tests`.
@@ -26,6 +29,7 @@ repo, several plugins, one shared CLI.
 - Anything the gate checks (seeds, floors, faults) lives in `dv.toml` or `vplan.yaml`
   of the target project, never in plugin code.
 - Before a push: `pytest -q tests` and `cd examples/fifo_block && control-eda verify`.
+- Hooks live only in `plugins/dv/`; other plugins rely on them (install always adds dv).
 
 ## Author
 

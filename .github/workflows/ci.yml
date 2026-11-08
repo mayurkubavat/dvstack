@@ -13,15 +13,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install simulators
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends verilator iverilog
+      - name: Install simulators and open-source formal
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends verilator iverilog yosys z3
       - name: Install control-eda
         run: pip install -e "tools/control-eda[dev]"
       - name: Validate plugin manifests
         run: |
-          python -c "import json,sys; [json.load(open(p)) for p in ['.claude-plugin/marketplace.json','plugins/dv/.claude-plugin/plugin.json','plugins/dv/hooks/hooks.json']]"
+          python -c "import json,sys; [json.load(open(p)) for p in ['.claude-plugin/marketplace.json','.cursor-plugin/marketplace.json','plugins/dv/.claude-plugin/plugin.json','plugins/dv/hooks/hooks.json','plugins/formal/.claude-plugin/plugin.json','plugins/formal/.cursor-plugin/plugin.json']]"
       - name: Run tests
         run: pytest -q tests
+      - name: Formal gate on the example block
+        working-directory: examples/fifo_block
+        run: control-eda formal check && control-eda rules test
+      - name: Formal gate degrades without tools
+        working-directory: examples/fifo_block
+        run: |
+          CONTROL_EDA_HIDE_TOOLS=yosys,yosys-smtbmc,sby,eqy control-eda formal check --json > /tmp/f.json || true
+          python -c "import json; d=json.load(open('/tmp/f.json')); assert d['status']=='tool_missing' and d['verdict']=='INCONCLUSIVE', d"
       - name: Evidence gate on the example block
         working-directory: examples/fifo_block
         run: control-eda verify --claim "[measured] CI run of the reference FIFO"

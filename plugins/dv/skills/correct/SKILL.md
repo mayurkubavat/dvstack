@@ -19,6 +19,10 @@ as high up the layers as it can go, then fix every existing violation in one wav
 | CI | A check the PR must pass | `.github/workflows/dv.yml` |
 | Skill text | Only when none of the above can express it | the relevant `SKILL.md` |
 
+For the lint and SVA layers, `formal:review-to-rule` writes the rule into the
+project's `rules.yaml` and `control-eda rules test` proves it fires; lint rules there
+run inside `control-eda lint`, so they need no EDA tool.
+
 ## Procedure
 
 1. State the comment in one line and count its occurrences (link them).

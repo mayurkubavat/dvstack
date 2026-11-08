@@ -20,6 +20,9 @@ from . import sim as simmod
 from . import verify as verifymod
 from . import vplan as vplanmod
 from . import wave as wavemod
+from . import rules as rulesmod
+from .formal import check as formalmod
+from .formal import equiv as equivmod
 from .util import emit, fail, parse_time
 
 EPILOG = """
@@ -34,6 +37,10 @@ examples:
   control-eda verify --claim "[measured] fix closes the hang" --json
   control-eda evidence bundle --claim "[measured] 6/6 seeds pass" --json > evidence/worktree.json
   control-eda evidence check evidence/worktree.json
+  control-eda formal detect --json
+  control-eda formal check --json
+  control-eda equiv --base main --json
+  control-eda rules test --json
 """
 
 
@@ -95,9 +102,28 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--door", choices=["two-way", "one-way"])
     sp.add_argument("--keep", action="store_true", help="keep previous sim results instead of starting clean")
     sp.add_argument("--quiet", action="store_true")
+    sp.add_argument("--equiv", metavar="BASE", help="also prove equivalence against BASE (for refactors)")
+    sp.add_argument("--no-formal", action="store_true", help="skip [formal] even if configured (recorded as a gap)")
+
+    sp = common(sub.add_parser("formal", help="formal: detect tools | check (prove, cover witnesses, fault counterexamples, assume audit)"))
+    sp.add_argument("action", choices=["detect", "check"])
+    sp.add_argument("--backend", help="force a backend (default: [formal].backend or auto)")
+    sp.add_argument("--depth", type=int, help="override [formal].depth for an exploratory run (the gate uses dv.toml)")
+    sp.add_argument("--only", help="comma list of prove,cover,mutate,assumes")
+
+    sp = common(sub.add_parser("equiv", help="prove the working tree is equivalent to a base commit (behavior-preserving refactor)"))
+    sp.add_argument("--base", required=True, help="git ref for the golden RTL, e.g. HEAD or main")
+    sp.add_argument("--files", nargs="*", help="override [equiv].sources")
+    sp.add_argument("--top")
+    sp.add_argument("--backend")
+
+    sp = common(sub.add_parser("rules", help="project rules from review comments (rules.yaml): list | check | test"))
+    sp.add_argument("action", choices=["list", "check", "test"])
+    sp.add_argument("--files", nargs="*")
 
     sp = common(sub.add_parser("install", help="install the dv plugin into a Cursor or Antigravity project folder"))
     sp.add_argument("--env", choices=["cursor", "antigravity"], required=True)
+    sp.add_argument("--plugins", default="all", help="comma list of plugins to install (default: all, e.g. dv,formal)")
     sp.add_argument("--project", default=".", help="project root (default: current directory)")
     sp.add_argument("--global", dest="global_scope", action="store_true", help="user-level install instead of the project")
     sp.add_argument("--probe", action="store_true", help="also record raw hook payloads to evidence/hook-probe.jsonl")
@@ -135,8 +161,9 @@ def main(argv: list[str] | None = None) -> None:
             emit(r, as_json, txt)
             sys.exit(0 if r.get("ok") else 1)
         if args.cmd == "install":
-            r = installmod.install(args.env, Path(args.project).resolve(), args.global_scope, args.dry_run, probe=args.probe)
-            emit(r, as_json, f"{'would install' if args.dry_run else 'installed'} dv for {args.env} under {r['root']}\n" + "\n".join("  " + a for a in r["actions"]) + "\n" + "\n".join("note: " + n for n in r["notes"]))
+            plugins = None if args.plugins == "all" else [x.strip() for x in args.plugins.split(",") if x.strip()]
+            r = installmod.install(args.env, Path(args.project).resolve(), args.global_scope, args.dry_run, probe=args.probe, plugins=plugins)
+            emit(r, as_json, f"{'would install' if args.dry_run else 'installed'} {', '.join(r['plugins'])} for {args.env} under {r['root']}\n" + "\n".join("  " + a for a in r["actions"]) + "\n" + "\n".join("note: " + n for n in r["notes"]))
             return
         if args.cmd == "wave-query":
             r = wavemod.query(Path(args.dump), parse_time(args.at), args.window, [s.strip() for s in args.signals.split(",")], args.clock)
@@ -148,7 +175,38 @@ def main(argv: list[str] | None = None) -> None:
             r = evmod.check(Path(args.path))
             emit(r, as_json, f"{r.get('verdict')} ({'valid' if r['ok'] else 'INVALID'})" + "".join(f"\n  - {x}" for x in r.get("problems", [])))
             sys.exit(0 if r["ok"] else 1)
+        if args.cmd == "formal" and args.action == "detect":
+            try:
+                c = cfgmod.load(start)
+            except cfgmod.ConfigError:
+                c = None
+            r = formalmod.detect(c)
+            emit(r, as_json, _detect_text(r))
+            return
         cfg = cfgmod.load(start)
+        if args.cmd == "formal":
+            prog = None if as_json else (lambda m: print(f"  ... {m}", file=sys.stderr))
+            only = [x.strip() for x in args.only.split(",")] if args.only else None
+            r = formalmod.run_check(cfg, args.backend, args.depth, only, prog)
+            r["reasons"] = formalmod.reasons(r) if r["verdict"] != "PASS" else []
+            emit(r, as_json, formalmod.text_report(r))
+            sys.exit(0 if r["verdict"] == "PASS" else 1)
+        if args.cmd == "equiv":
+            r = equivmod.run_equiv(cfg, args.base, args.files, args.backend, args.top)
+            emit(r, as_json, equivmod.text_report(r))
+            sys.exit(0 if r["verdict"] == "PASS" else 1)
+        if args.cmd == "rules":
+            if args.action == "list":
+                r = rulesmod.list_rules(cfg)
+                txt = "\n".join(f"{x['id']:24} {x['kind']:5} {x.get('message') or x.get('assertion') or ''}" for x in r.get("rules", [])) or "no rules.yaml"
+            elif args.action == "check":
+                r = rulesmod.check(cfg, args.files)
+                txt = f"{r['violation_count']} violations" + "".join(f"\n  {v['file']}:{v['line']}: [{v['rule']}] {v['message']}" for v in r["violations"])
+            else:
+                r = rulesmod.test(cfg)
+                txt = "\n".join(f"{x['id']:24} {x['state']}" + "".join(f"\n    - {p}" for p in x.get("problems", [])) for x in r.get("rules", [])) or "no rules.yaml"
+            emit(r, as_json, txt)
+            sys.exit(0 if r.get("ok") else 1)
         if args.cmd == "lint":
             r = lintmod.lint(cfg, args.files)
             (cfg.evidence_dir / "lint.json").write_text(json.dumps(r, indent=2))
@@ -199,7 +257,7 @@ def main(argv: list[str] | None = None) -> None:
             return
         if args.cmd == "verify":
             prog = None if (as_json or args.quiet) else (lambda m: print(f"  ... {m}", file=sys.stderr))
-            r = verifymod.run_verify(cfg, args.base, args.files, args.claim, args.gap, args.door, args.keep, prog)
+            r = verifymod.run_verify(cfg, args.base, args.files, args.claim, args.gap, args.door, args.keep, prog, equiv_base=args.equiv, formal=not args.no_formal)
             emit(r, as_json, verifymod.text_report(r))
             sys.exit(0 if r["ok"] else 1)
         if args.cmd == "evidence":
@@ -215,6 +273,19 @@ def main(argv: list[str] | None = None) -> None:
         fail(str(e), as_json=as_json)
     except RuntimeError as e:
         fail(str(e), as_json=as_json)
+
+
+def _detect_text(r: dict) -> str:
+    lines = ["formal backends:"]
+    for b in r["formal"]:
+        lines.append(f"  {'ok     ' if b['available'] else 'missing'}  {b['name']:10} {b['title']}" + ("" if b["available"] else f"  (needs {', '.join(b['missing'])})"))
+    lines.append("equivalence backends:")
+    for b in r["equiv"]:
+        lines.append(f"  {'ok     ' if b['available'] else 'missing'}  {b['name']:10} {b['title']}" + ("" if b["available"] else f"  (needs {', '.join(b['missing'])})"))
+    lines.append(f"solvers: {', '.join(r['solvers']) or 'none'}")
+    lines.append(f"selected: formal={r['selected']['formal'] or 'NONE'} equiv={r['selected']['equiv'] or 'NONE'}")
+    lines += [f"hint: {h}" for h in r["hints"]]
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

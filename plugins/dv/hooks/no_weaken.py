@@ -6,19 +6,26 @@ Blocked in HDL and DV config files:
   - adding `disable iff` to an existing assertion
   - adding coverage exclusions (`ignore_bins`, `illegal_bins` removal, exclude files)
   - adding inline lint waiver pragmas (verilator lint_off, spyglass waive, etc.)
+  - removing a `cover property` (a cover is the witness that an assert is not vacuous)
+  - adding an `assume property` that vplan.yaml does not tie to an upstream assert
   - removing seeds or lowering coverage targets in dv.toml
+  - lowering [formal] depth, setting accept_bounded = true or required = false in dv.toml
 Humans do these on purpose; agents do them to get green. The agent is told to ask.
 """
 from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 import dvhook  # noqa: E402
 
 ASSERT_RE = re.compile(r"^\s*(\w+\s*:\s*)?assert\s+property", re.M)
 COMMENTED_ASSERT_RE = re.compile(r"^\s*//.*assert\s+property", re.M)
+COVER_RE = re.compile(r"^\s*(\w+\s*:\s*)?cover\s+property", re.M)
+ASSUME_LABEL_RE = re.compile(r"(?:\b(\w+)\s*:\s*)?\bassume\s+property")
+FORMAL_SECTION_RE = re.compile(r"^\s*\[formal\]\s*$(.*?)(?=^\s*\[|\Z)", re.M | re.S)
 DISABLE_IFF_RE = re.compile(r"disable\s+iff", re.I)
 IGNORE_BINS_RE = re.compile(r"\bignore_bins\b")
 ILLEGAL_BINS_RE = re.compile(r"\billegal_bins\b")
@@ -51,13 +58,52 @@ def check_hdl(old: str, new: str, is_write: bool) -> list[str]:
             reasons.append("adds `ignore_bins` (coverage exclusion)")
         if count(ILLEGAL_BINS_RE, new) < count(ILLEGAL_BINS_RE, old):
             reasons.append("removes `illegal_bins`")
+        if count(COVER_RE, new) < count(COVER_RE, old):
+            reasons.append("removes a `cover property` (the witness that an assertion is not vacuous)")
     if count(WAIVER_RE, new) > count(WAIVER_RE, old):
         reasons.append("adds an inline lint or coverage waiver pragma (waivers belong in the central waiver file a human signs)")
     return reasons
 
 
-def check_dv_toml(old: str, new: str) -> list[str]:
+def check_assumes(old: str, new: str, vplan_text: str | None) -> list[str]:
+    """A new assume constrains the proof. It must be listed in vplan `assumes:` with its upstream assert."""
+    added = [m.group(1) for m in ASSUME_LABEL_RE.finditer(new)]
+    before = [m.group(1) for m in ASSUME_LABEL_RE.finditer(old)]
+    if len(added) <= len(before):
+        return []
+    fresh = [a for a in added if a not in before] or [None]
+    vp = vplan_text or ""
+    unlisted = [a for a in fresh if not a or not re.search(rf"^\s*{re.escape(a)}\s*:", vp, re.M)]
+    if not unlisted:
+        return []
+    names = ", ".join(a or "(unlabeled)" for a in unlisted)
+    return [f"adds `assume property` {names} that vplan.yaml does not list under `assumes:` with the upstream assert that guarantees it "
+            "(an unchecked assume can hide every bug it excludes)"]
+
+
+def _formal(text: str) -> str:
+    m = FORMAL_SECTION_RE.search(text)
+    return m.group(1) if m else ""
+
+
+def check_formal_toml(old: str, new: str) -> list[str]:
     reasons = []
+    o, n = _formal(old), _formal(new)
+    if o and not n:
+        return ["removes the [formal] section"]
+    od, nd = re.search(r"^\s*depth\s*=\s*(\d+)", o, re.M), re.search(r"^\s*depth\s*=\s*(\d+)", n, re.M)
+    if od and (not nd or int(nd.group(1)) < int(od.group(1))):
+        reasons.append(f"lowers [formal] depth {od.group(1)} -> {nd.group(1) if nd else 'default'}")
+    for key, bad in (("accept_bounded", "true"), ("required", "false")):
+        ov = re.search(rf"^\s*{key}\s*=\s*(\w+)", o, re.M)
+        nv = re.search(rf"^\s*{key}\s*=\s*(\w+)", n, re.M)
+        if nv and nv.group(1).lower() == bad and (not ov or ov.group(1).lower() != bad):
+            reasons.append(f"sets [formal] {key} = {bad}")
+    return reasons
+
+
+def check_dv_toml(old: str, new: str) -> list[str]:
+    reasons = check_formal_toml(old, new)
     o, n = SEEDS_RE.search(old), SEEDS_RE.search(new)
     if o and n:
         old_seeds = {s.strip() for s in o.group(1).split(",") if s.strip()}
@@ -102,8 +148,25 @@ def main() -> None:
     reasons: list[str] = []
     if dvhook.is_hdl(path):
         reasons = check_hdl(old, new, is_write)
+        vplan_text = None
+        for d in [Path(path).resolve().parent, *Path(path).resolve().parents]:
+            if (d / "vplan.yaml").exists():
+                vplan_text = (d / "vplan.yaml").read_text(errors="replace")
+                break
+            if (d / "dv.toml").exists():
+                break
+        reasons += check_assumes(old, new, vplan_text)
     elif name == "dv.toml":
         reasons = check_dv_toml(old, new)
+        # [formal] settings need the whole file to know which section an Edit touches
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                disk = f.read()
+        except OSError:
+            disk = ""
+        if disk and old and old in disk and ev.get("tool_name") != "Write":
+            full_new = disk.replace(old, new, 1)
+            reasons = [r for r in reasons if "[formal]" not in r] + check_formal_toml(disk, full_new)
     elif name in ("vplan.yaml", "vplan.yml"):
         reasons = check_vplan(old, new)
     elif name.endswith((".waiver", ".waivers", ".el", ".exclude", "_exclusions.txt")):

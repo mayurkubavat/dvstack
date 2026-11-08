@@ -1,4 +1,4 @@
-# One plugin, three agent environments
+# Every plugin, three agent environments
 
 The logic lives in two places that every environment can run: `control-eda`
 (a CLI with JSON output) and the hook scripts in `plugins/dv/hooks/`. Skills,
@@ -7,15 +7,21 @@ environment gets a thin adapter, nothing more.
 
 | | Claude Code | Cursor | Google Antigravity |
 | --- | --- | --- | --- |
-| Install | `/plugin marketplace add mayurkubavat/dvstack` then `/plugin install dv@dvstack` | `control-eda install --env cursor` (writes `.cursor/`) or the marketplace once listed | `control-eda install --env antigravity` (writes `.agents/`) |
+| Install | `/plugin marketplace add mayurkubavat/dvstack` then `/plugin install dv@dvstack` (and `formal@dvstack`) | `control-eda install --env cursor` (writes `.cursor/`, all plugins; `--plugins dv,formal` to choose) or the marketplace once listed | `control-eda install --env antigravity` (writes `.agents/`, same `--plugins`) |
 | Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` | none (folder convention) |
 | Skills | `skills/<name>/SKILL.md` | same | `.agents/skills/<name>/SKILL.md`, same frontmatter |
 | Subagents | `agents/*.md` | `agents/*.md` | installed as skills (no subagent concept) |
 | Commands | `commands/*.md` | `commands/*.md` | installed as `.agents/workflows/*.md` |
-| Rules | not needed (hooks) | `rules/dv-gate.mdc`, `alwaysApply: true` | `.agents/rules/dv-gate.md`, `trigger: always_on` |
+| Rules | not needed (hooks) | `rules/dv-gate.mdc`, `rules/formal-gate.mdc`, `alwaysApply: true` | `.agents/rules/*.md`, `trigger: always_on` |
 | Hooks file | `hooks/hooks.json` | `hooks/cursor-hooks.json` (named in the manifest) | `.agents/hooks.json` |
 | Hook protocol | stdin JSON, exit 2 blocks, stderr is the reason | stdin JSON, stdout `{"permission":"deny"}` | stdin JSON, stdout `{"decision":"deny"}` |
 | Adapter | none | `hooks/adapt.py --env cursor <hook>` | `hooks/adapt.py --env antigravity <hook>` |
+
+Hooks ship only in the `dv` plugin, and they guard the formal gate too (covers,
+assumes, `[formal]` settings), so `install` always includes `dv`. The `formal`
+plugin is skills, a command and a rule file over `control-eda`, which behaves the
+same in every environment: it finds the formal tools on the machine at run time
+and reports `tool_missing` with an install hint when there are none.
 
 ## Event mapping
 

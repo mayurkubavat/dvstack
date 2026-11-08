@@ -1,0 +1,32 @@
+# Review comments promoted to checks (see formal:review-to-rule).
+# `control-eda rules test` proves each rule fires; `control-eda lint` enforces the lint rules.
+version: 1
+rules:
+  - id: no-casex
+    review: "Don't use casex, it treats X as don't-care and hides bugs"
+    seen: [initial]
+    kind: lint
+    files: ["rtl/*.sv"]
+    pattern: '\bcasex\b'
+    message: "casex hides X; use `case (...) inside` or `unique case`"
+    examples:
+      bad: ["casex (sel)", "  casex(op) 4'b1???: y = a;"]
+      good: ["case (sel) inside", "unique case (op)", "// casex is banned"]
+
+  - id: no-delay-in-rtl
+    review: "No # delays in synthesizable RTL"
+    seen: [initial]
+    kind: lint
+    files: ["rtl/*.sv"]
+    pattern: '(?<![\w)])#\s*\d+(\.\d+)?\s*(fs|ps|ns|us|ms|s)?\s*[;\w(]'
+    message: "# delay in RTL: synthesis ignores it and simulation then disagrees with gates"
+    examples:
+      bad: ["q <= #1 d;", "#5 rst = 0;"]
+      good: ["fifo #(.DEPTH(4)) u_fifo (.*);", "parameter int W = 8;"]
+
+  - id: fifo-full-exact
+    review: "full must mean exactly DEPTH entries, not almost-full"
+    seen: [initial]
+    kind: sva
+    assertion: a_full_iff_depth
+    fault: FIFO_BUG_FULL_EARLY

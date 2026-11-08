@@ -15,7 +15,28 @@
       "description": "Evidence gate (dv:verify), agent-readable vplan, failure triage and review-comment-to-rule promotion for DV teams.",
       "version": "0.1.0",
       "category": "verification",
-      "keywords": ["systemverilog", "uvm", "verilator", "coverage", "sva"]
+      "keywords": [
+        "systemverilog",
+        "uvm",
+        "verilator",
+        "coverage",
+        "sva"
+      ]
+    },
+    {
+      "name": "formal",
+      "source": "./plugins/formal",
+      "description": "Formal anti-vacuity gate for SVA (proof, cover witness, fault counterexample, assume audit), equivalence-proven refactors, and review comments promoted to lint/SVA rules. Works with whatever formal tool is installed.",
+      "version": "0.1.0",
+      "category": "verification",
+      "keywords": [
+        "formal",
+        "sva",
+        "symbiyosys",
+        "yosys",
+        "equivalence",
+        "lec"
+      ]
     }
   ]
 }

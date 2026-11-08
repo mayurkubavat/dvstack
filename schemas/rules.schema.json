@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mayurkubavat/dvstack/schemas/rules.schema.json",
+  "title": "project rules promoted from review comments",
+  "type": "object",
+  "required": [
+    "version",
+    "rules"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "review"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "review": {
+            "type": "string",
+            "description": "the review comment this rule replaces, in the reviewer's words"
+          },
+          "seen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "links to where the comment was made"
+          },
+          "kind": {
+            "enum": [
+              "lint",
+              "sva"
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pattern": {
+            "type": "string",
+            "description": "lint: Python regex, matched with comments blanked unless ignore_comments is false"
+          },
+          "ignore_comments": {
+            "type": "boolean"
+          },
+          "ignore_case": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ]
+          },
+          "examples": {
+            "type": "object",
+            "properties": {
+              "bad": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "good": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "assertion": {
+            "type": "string",
+            "description": "sva: the assert label that implements the rule"
+          },
+          "fault": {
+            "type": "string",
+            "description": "sva: the fault define formal must show the assertion catches"
+          }
+        }
+      }
+    }
+  }
+}

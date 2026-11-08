@@ -12,6 +12,8 @@ TOOLS = {
     "verible": ("verible-verilog-lint", "--version"),
     "yosys": ("yosys", "-V"),
     "sby": ("sby", "--help"),
+    "yosys-smtbmc": ("yosys-smtbmc", "-h"),
+    "z3": ("z3", "--version"),
     "fst2vcd": ("fst2vcd", "-h"),
     "git": ("git", "--version"),
 }
@@ -46,6 +48,15 @@ def run_doctor(start: Path | None = None) -> dict:
         if sim_tool in ("verilator", "icarus") and not tools["verilator" if sim_tool == "verilator" else "iverilog"]["ok"]:
             result["problems"].append(f"[sim].tool is {sim_tool} but it is not installed")
             result["hints"].append("apt-get install verilator  (or brew install verilator)")
+        from .formal import check as formalmod
+        fd = formalmod.detect(cfg)
+        result["formal"] = {"configured": fd["configured"], "selected": fd["selected"], "solvers": fd["solvers"]}
+        if cfg.raw.get("formal") and not fd["selected"]["formal"]:
+            msg = "[formal] is configured but no formal tool is installed; `control-eda formal detect` lists the options"
+            if (cfg.raw.get("formal") or {}).get("required"):
+                result["problems"].append(msg)
+            else:
+                result["hints"].append(msg + " (formal results will be INCONCLUSIVE; simulation still gates)")
     except cfgmod.ConfigError as e:
         result["problems"].append(str(e))
     if not tools["verilator"]["ok"] and not tools["iverilog"]["ok"]:
@@ -61,6 +72,9 @@ def text_report(d: dict) -> str:
     p = d.get("project") or {}
     if p:
         lines += ["", f"  project {p.get('name')} at {p.get('root')}", f"  tests: {', '.join(p.get('tests', [])) or '(none)'}"]
+    f = d.get("formal")
+    if f:
+        lines.append(f"  formal: {f['selected']['formal'] or 'no backend'}   equiv: {f['selected']['equiv'] or 'no backend'}   solvers: {', '.join(f['solvers']) or 'none'}")
     if d["problems"]:
         lines += ["", "problems:"] + [f"  - {x}" for x in d["problems"]]
     if d["hints"]:

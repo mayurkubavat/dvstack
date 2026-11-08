@@ -77,6 +77,13 @@ def check(cfg: Config) -> dict:
         for c in f.get("covers") or []:
             if c not in labels:
                 problems.append(f"{f.get('id')}: cover label '{c}' not found in RTL")
+        assumes = f.get("assumes") or {}
+        if not isinstance(assumes, dict):
+            problems.append(f"{f.get('id')}: assumes must map an assume label to its upstream assert, e.g. {{m_valid_stable: producer.a_valid_stable}}")
+            continue
+        for a in assumes:
+            if labels.get(a) != "assume":
+                problems.append(f"{f.get('id')}: assume label '{a}' not found in RTL")
     return {
         "ok": not problems,
         "block": data.get("block"),

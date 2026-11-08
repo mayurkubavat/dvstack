@@ -10,6 +10,7 @@ from pathlib import Path
 from .config import Config
 
 SCHEMA = Path(__file__).resolve().parents[3] / "schemas" / "evidence.schema.json"
+PROOF_STATES = ("pass", "fail", "not_run", "proven", "bounded", "cex", "unknown", "unsupported", "tool_missing")
 LABEL_RE = re.compile(r"^\s*\[(measured|inferred|guessed)\]\s*(.+)$", re.I)
 
 
@@ -87,6 +88,8 @@ def bundle(cfg: Config, base: str | None, block: str | None, door: str, claims: 
                     rows_by_assert[a] = row
         except Exception:  # a broken vplan is reported by `vplan check`, not here
             rows_by_assert = {}
+    formal, formal_asserts = _formal_evidence(cfg)
+    equiv = _equiv_evidence(cfg)
     sva = []
     for name, f in sorted(asserts.items()):
         row = rows_by_assert.get(name)
@@ -104,7 +107,11 @@ def bundle(cfg: Config, base: str | None, block: str | None, door: str, claims: 
             mutation = "missed"
         else:
             mutation = "not_available"
-        sva.append({"name": name, "file": f, "proof": "not_run", "cover": cover_state, "mutation": mutation, "fault": fault, "vplan": row.get("id") if row else None})
+        entry = {"name": name, "file": f, "proof": "not_run", "cover": cover_state, "mutation": mutation, "fault": fault, "vplan": row.get("id") if row else None}
+        fa = formal_asserts.get(name)
+        if fa:
+            entry.update({"proof": fa["proof"], "witness": fa.get("witness"), "formal_mutation": fa.get("mutation")})
+        sva.append(entry)
 
     files = changed_files(cfg, base)
     sha = git(cfg, "rev-parse", "--short", "HEAD") or "worktree"
@@ -129,8 +136,43 @@ def bundle(cfg: Config, base: str | None, block: str | None, door: str, claims: 
         "claims": parsed_claims,
         "gaps": list(gaps),
     }
+    if formal is not None:
+        b["formal"] = formal
+    if equiv is not None:
+        b["equiv"] = equiv
     b["verdict"] = verdict(b)
     return b
+
+
+def _formal_evidence(cfg: Config) -> tuple[dict | None, dict]:
+    """Summary of evidence/formal.json if it matches the current sources, else a 'stale' marker."""
+    p = cfg.evidence_dir / "formal.json"
+    if not p.exists():
+        return None, {}
+    try:
+        r = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return {"verdict": "INCONCLUSIVE", "status": "unreadable", "required": False}, {}
+    from .formal.check import source_hash
+    stale = r.get("status") == "ran" and source_hash(cfg, r.get("files") or []) != r.get("source_hash")
+    summary = {"verdict": "INCONCLUSIVE" if stale else r.get("verdict"), "status": "stale" if stale else r.get("status"),
+               "backend": r.get("backend"), "depth": r.get("depth"), "required": bool(r.get("required")),
+               "faults": [{"fault": f["fault"], "state": f["state"]} for f in r.get("faults", [])], "report": "evidence/formal.json"}
+    return summary, ({} if stale else {a["name"]: a for a in r.get("asserts", [])})
+
+
+def _equiv_evidence(cfg: Config) -> dict | None:
+    p = cfg.evidence_dir / "equiv.json"
+    if not p.exists():
+        return None
+    try:
+        r = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return {"verdict": "INCONCLUSIVE", "status": "unreadable"}
+    from .formal.check import source_hash
+    stale = source_hash(cfg, r.get("files") or []) != r.get("source_hash")
+    return {"verdict": "INCONCLUSIVE" if stale else r.get("verdict"), "status": "stale" if stale else r.get("status"),
+            "base": r.get("base"), "backend": r.get("backend"), "unproven": r.get("unproven", []), "report": "evidence/equiv.json"}
 
 
 def verdict(b: dict) -> str:
@@ -151,11 +193,22 @@ def verdict(b: dict) -> str:
         return "FAIL"
     if any(c["label"] == "guessed" for c in b["claims"]):
         return "INCONCLUSIVE"
+    f, e = b.get("formal"), b.get("equiv")
+    if f and f.get("verdict") == "FAIL":
+        return "FAIL"
+    if e and e.get("verdict") == "FAIL":
+        return "FAIL"
+    if any(s.get("proof") in ("cex", "fail") for s in b["sva"]):
+        return "FAIL"
     for s in b["sva"]:
         if s["cover"] == "not_hit" or s["mutation"] == "missed":
             return "FAIL"
         if s["cover"] == "missing" or s["mutation"] == "not_available":
             return "INCONCLUSIVE"
+    if f and f.get("verdict") != "PASS" and (f.get("required") or f.get("status") not in ("tool_missing",)):
+        return "INCONCLUSIVE"
+    if e and e.get("verdict") != "PASS":
+        return "INCONCLUSIVE"
     return "PASS"
 
 
@@ -191,6 +244,8 @@ def _validate(b: dict) -> list[str]:
         if r.get("status") not in ("pass", "fail", "error"):
             problems.append(f"run {r.get('test')}/{r.get('seed')} has bad status")
     for s in b.get("sva", []):
+        if s.get("proof", "not_run") not in PROOF_STATES:
+            problems.append(f"sva {s.get('name')} has bad proof state")
         if s.get("cover") not in ("hit", "not_hit", "missing") or s.get("mutation") not in ("caught", "missed", "not_available"):
             problems.append(f"sva {s.get('name')} has bad cover/mutation state")
     return problems

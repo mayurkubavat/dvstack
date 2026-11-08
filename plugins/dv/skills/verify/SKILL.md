@@ -89,6 +89,13 @@ For each `assert property` added or edited in the diff:
   project has no fault defines, record `mutation: "not_available"` and the gate
   result becomes `INCONCLUSIVE` for that assertion, not `PASS`.
 
+If `dv.toml` has a `[formal]` section, `control-eda verify` also runs
+`control-eda formal check` (proof, cover witness, fault counterexample, assume
+audit; see the `formal` plugin) and folds it into the bundle: a counterexample or a
+vacuous assertion is FAIL. With no formal tool installed it is recorded as a gap
+naming what to install, and the verdict rests on simulation unless
+`[formal].required = true`. Report that gap; never say the assertions were proven.
+
 ### 7. Bundle
 
 ```bash

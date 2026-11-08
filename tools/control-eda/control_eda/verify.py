@@ -17,9 +17,11 @@ from . import lint as lintmod
 from . import sim as simmod
 from . import vplan as vplanmod
 from .config import Config
+from .formal import check as formalmod
+from .formal import equiv as equivmod
 
 
-def run_verify(cfg: Config, base: str | None, files: list[str] | None, claims: list[str], gaps: list[str], door: str | None, keep: bool, progress=None) -> dict:
+def run_verify(cfg: Config, base: str | None, files: list[str] | None, claims: list[str], gaps: list[str], door: str | None, keep: bool, progress=None, equiv_base: str | None = None, formal: bool = True) -> dict:
     say = progress or (lambda *_: None)
     steps: dict = {}
 
@@ -76,7 +78,34 @@ def run_verify(cfg: Config, base: str | None, files: list[str] | None, claims: l
     covr = covmod.merge_project(cfg)
     steps["cov"] = {"percent": covr.get("percent"), "floor": cfg.cov.get("floor")}
 
-    # 6. bundle
+    # 6. formal (only when dv.toml has [formal]); a missing tool is a gap, or INCONCLUSIVE when required
+    for stale in ("formal.json", "equiv.json"):
+        if not keep and (cfg.evidence_dir / stale).exists():
+            (cfg.evidence_dir / stale).unlink()
+    if cfg.raw.get("formal"):
+        if not formal:
+            all_gaps.append("formal skipped with --no-formal")
+            steps["formal"] = {"verdict": "SKIPPED"}
+        else:
+            fr = formalmod.run_check(cfg, progress=lambda m: say(m))
+            steps["formal"] = {"verdict": fr["verdict"], "backend": fr.get("backend"), "status": fr.get("status")}
+            if fr.get("status") == "tool_missing":
+                (cfg.evidence_dir / "formal.json").write_text(json.dumps(fr, indent=2))
+                if not fr.get("required"):
+                    all_gaps.append("formal not run: no formal tool on this machine (" + (fr.get("install") or "") + "). "
+                                    "Simulation evidence stands alone; set [formal].required = true to make this INCONCLUSIVE")
+            elif fr["verdict"] != "PASS":
+                all_gaps += [f"formal: {x}" for x in formalmod.reasons(fr)[:12]]
+
+    # 7. equivalence (refactors)
+    if equiv_base:
+        say(f"equiv vs {equiv_base}")
+        er = equivmod.run_equiv(cfg, equiv_base)
+        steps["equiv"] = {"verdict": er["verdict"], "status": er.get("status"), "backend": er.get("backend"), "unproven": er.get("unproven")}
+        if er["verdict"] != "PASS":
+            all_gaps.append(f"equiv vs {equiv_base}: {er.get('status')}" + (f" ({er.get('detail')})" if er.get("detail") else ""))
+
+    # 8. bundle
     say("bundle")
     d = door or doormod.classify(cfg, base)["door"]
     b = evmod.bundle(cfg, base, None, d, claims, all_gaps)
@@ -84,7 +113,8 @@ def run_verify(cfg: Config, base: str | None, files: list[str] | None, claims: l
     out.write_text(json.dumps(b, indent=2))
     if b["sha"] != "worktree":
         (cfg.evidence_dir / "worktree.json").write_text(json.dumps(b, indent=2))
-    return {"ok": b["verdict"] == "PASS", "verdict": b["verdict"], "bundle": str(out.relative_to(cfg.root)), "steps": steps, "gaps": all_gaps, "sva": b["sva"]}
+    return {"ok": b["verdict"] == "PASS", "verdict": b["verdict"], "bundle": str(out.relative_to(cfg.root)), "steps": steps, "gaps": all_gaps, "sva": b["sva"],
+            "formal": b.get("formal"), "equiv": b.get("equiv")}
 
 
 def _save_run(cfg: Config, r: dict) -> None:
@@ -99,8 +129,15 @@ def text_report(r: dict) -> str:
     lines.append(f"  lint   {s['lint']['errors']} errors, {s['lint']['warnings']} warnings")
     lines.append(f"  sim    {s['sim']['runs']} runs, {s['sim']['failed']} not ok   tests={s['scope']['tests']} faults={s['scope']['faults']}")
     lines.append(f"  cov    {s['cov']['percent']}% (floor {s['cov']['floor']})")
+    if "formal" in s:
+        f = s["formal"]
+        lines.append(f"  formal {f.get('verdict')} ({f.get('backend') or f.get('status') or 'skipped'})")
+    if "equiv" in s:
+        e = s["equiv"]
+        lines.append(f"  equiv  {e.get('verdict')} ({e.get('status')}, {e.get('backend') or 'no backend'})")
     for a in r["sva"]:
-        lines.append(f"  sva    {a['name']}: cover {a['cover']}, mutation {a['mutation']}" + (f" ({a['fault']})" if a.get("fault") else ""))
+        lines.append(f"  sva    {a['name']}: cover {a['cover']}, mutation {a['mutation']}" + (f" ({a['fault']})" if a.get("fault") else "")
+                     + (f", proof {a['proof']}" if a.get("proof") not in (None, "not_run") else ""))
     if r["gaps"]:
         lines += ["", "gaps:"] + [f"  - {g}" for g in r["gaps"]]
     return "\n".join(lines)

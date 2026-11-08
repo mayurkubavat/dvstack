@@ -12,6 +12,28 @@ VERIBLE_MSG = re.compile(r"^([^:]+):(\d+):(\d+)(?:-\d+)?: (.*)$")
 
 
 def lint(cfg: Config, files: list[str] | None = None) -> dict:
+    """Tool lint plus the project's tested rules.yaml lint rules (those need no EDA tool)."""
+    r = _tool_lint(cfg, files)
+    from . import rules as rulesmod
+    if not (cfg.root / "rules.yaml").exists():
+        return r
+    rr = rulesmod.check(cfg, files, tested_only=True)
+    found = [{"file": v["file"], "line": v["line"], "code": f"rule:{v['rule']}", "message": v["message"]} for v in rr["violations"]]
+    errs = [f for f, v in zip(found, rr["violations"]) if v["severity"] == "error"]
+    warns = [f for f, v in zip(found, rr["violations"]) if v["severity"] != "error"]
+    r.setdefault("errors", [])
+    r.setdefault("warnings", [])
+    r["errors"] += errs
+    r["warnings"] += warns
+    r["rules"] = {"violations": len(found), "problems": rr["problems"]}
+    if "error_count" in r:
+        r["error_count"] = len(r["errors"])
+        r["warning_count"] = len(r["warnings"])
+        r["ok"] = not r["errors"]
+    return r
+
+
+def _tool_lint(cfg: Config, files: list[str] | None = None) -> dict:
     tool = cfg.lint.get("tool", "verilator")
     srcs = files or cfg.lint.get("sources") or cfg.sources
     log = cfg.evidence_dir / "lint.log"

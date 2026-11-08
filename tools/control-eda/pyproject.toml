@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "control-eda"
-version = "0.1.0"
-description = "Agent-friendly CLI over EDA tools: doctor, lint, sim, cov, wave-query, vplan, evidence. JSON everywhere."
+version = "0.2.0"
+description = "Agent-friendly CLI over EDA tools: doctor, lint, sim, cov, wave-query, vplan, evidence, formal, equiv, rules. JSON everywhere."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

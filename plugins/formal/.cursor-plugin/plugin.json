@@ -1,0 +1,11 @@
+{
+  "name": "formal",
+  "version": "0.1.0",
+  "description": "Formal anti-vacuity gate for SVA, equivalence-proven RTL refactors, and review comments promoted to lint/SVA rules. Tools are found at run time.",
+  "author": { "name": "Mayur Kubavat", "url": "https://github.com/mayurkubavat" },
+  "homepage": "https://github.com/mayurkubavat/dvstack",
+  "repository": "https://github.com/mayurkubavat/dvstack",
+  "license": "MIT",
+  "keywords": ["formal", "sva", "symbiyosys", "yosys", "equivalence", "lec", "vacuity"],
+  "rules": "./rules"
+}
