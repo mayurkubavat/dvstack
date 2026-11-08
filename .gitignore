@@ -3,15 +3,17 @@ build/
 obj_dir/
 *.vvp
 
-# evidence is per-run; commit only what a PR cites
-evidence/sim/
-evidence/*.log
-evidence/cov.json
-evidence/lint.json
-evidence/worktree.json
-evidence/formal.json
-evidence/equiv.json
-evidence/.one-way-door
+# evidence is per-run; commit only what a PR cites (evidence/<sha>.json)
+**/evidence/sim/
+**/evidence/*.log
+**/evidence/cov.json
+**/evidence/lint.json
+**/evidence/worktree.json
+**/evidence/formal.json
+**/evidence/equiv.json
+**/evidence/.one-way-door
+**/evidence/.hook-probe
+**/evidence/hook-probe.jsonl
 
 # python
 __pycache__/
