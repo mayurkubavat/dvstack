@@ -14,6 +14,7 @@ from . import doctor as doctormod
 from . import door as doormod
 from . import evidence as evmod
 from . import install as installmod
+from . import probe as probemod
 from . import lint as lintmod
 from . import sim as simmod
 from . import verify as verifymod
@@ -99,7 +100,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--env", choices=["cursor", "antigravity"], required=True)
     sp.add_argument("--project", default=".", help="project root (default: current directory)")
     sp.add_argument("--global", dest="global_scope", action="store_true", help="user-level install instead of the project")
+    sp.add_argument("--probe", action="store_true", help="also record raw hook payloads to evidence/hook-probe.jsonl")
     sp.add_argument("--dry-run", action="store_true")
+
+    sp = common(sub.add_parser("probe", help="capture raw hook payloads from a Cursor/Antigravity session: on | off | report"))
+    sp.add_argument("action", choices=["on", "off", "report"])
+    sp.add_argument("--project", default=".")
 
     sp = common(sub.add_parser("evidence", help="bundle | check the evidence file"))
     sp.add_argument("action", choices=["bundle", "check"])
@@ -122,8 +128,14 @@ def main(argv: list[str] | None = None) -> None:
             d = doctormod.run_doctor(start)
             emit(d, as_json, doctormod.text_report(d))
             sys.exit(0 if d["ok"] else 1)
+        if args.cmd == "probe":
+            root = Path(args.project).resolve()
+            r = {"on": probemod.enable, "off": probemod.disable, "report": probemod.report}[args.action](root)
+            txt = json.dumps(r, indent=2) if args.action == "report" else ("probe on: payloads go to evidence/hook-probe.jsonl" if r.get("enabled") else "probe off")
+            emit(r, as_json, txt)
+            sys.exit(0 if r.get("ok") else 1)
         if args.cmd == "install":
-            r = installmod.install(args.env, Path(args.project).resolve(), args.global_scope, args.dry_run)
+            r = installmod.install(args.env, Path(args.project).resolve(), args.global_scope, args.dry_run, probe=args.probe)
             emit(r, as_json, f"{'would install' if args.dry_run else 'installed'} dv for {args.env} under {r['root']}\n" + "\n".join("  " + a for a in r["actions"]) + "\n" + "\n".join("note: " + n for n in r["notes"]))
             return
         if args.cmd == "wave-query":

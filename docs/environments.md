@@ -27,6 +27,24 @@ environment gets a thin adapter, nothing more.
 | `human_relay_check` | UserPromptSubmit | beforeSubmitPrompt | not available (rule covers it) |
 | `evidence_gate` | Stop, SubagentStop | stop (`followup_message`) | Stop (`decision: continue`) |
 
+## Confirming the mappings with one real session
+
+The tool names Cursor and Antigravity send to hooks are mapped from their docs.
+One agent session per tool confirms them:
+
+```bash
+control-eda install --env antigravity --probe     # or --env cursor
+# open the project in the tool and ask its agent to:
+#   1. make a harmless RTL edit (e.g. rename a local signal)
+#   2. remove an assert property   (should be blocked)
+#   3. finish without running control-eda verify   (should be refused)
+control-eda probe report          # tools seen, unmapped edit tools, what was blocked
+control-eda probe off
+```
+
+If `edit_tools_not_mapped` is non-empty, send the report; `hooks/adapt.py` learns
+the new names and the tests get a case for them.
+
 ## What is weaker outside Claude Code
 
 - Antigravity's `PostToolUse` has no documented way to inject context, so lint

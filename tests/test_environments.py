@@ -119,3 +119,18 @@ def test_cursor_manifests_are_valid_json():
     m = json.loads((ROOT / ".cursor-plugin" / "marketplace.json").read_text())
     for entry in m["plugins"]:
         assert (ROOT / entry["source"] / ".cursor-plugin" / "plugin.json").exists()
+
+
+class TestProbe:
+    def test_probe_records_and_reports(self, tmp_path):
+        subprocess.run(["control-eda", "install", "--env", "antigravity", "--project", str(tmp_path), "--probe", "--json"], check=True, capture_output=True)
+        assert (tmp_path / "evidence" / ".hook-probe").exists()
+        payload = {"workspacePaths": [str(tmp_path)], "stepIdx": 1, "toolCall": {"name": "mystery_edit", "args": {"Path": "a.sv", "Body": "x"}}}
+        p = subprocess.run([sys.executable, str(tmp_path / ".agents" / "hooks" / "dv" / "adapt.py"), "--env", "antigravity", "no_weaken"], input=json.dumps(payload), capture_output=True, text=True, cwd=tmp_path)
+        assert json.loads(p.stdout.strip().splitlines()[-1]) == {"decision": "allow"}
+        r = json.loads(subprocess.run(["control-eda", "probe", "report", "--project", str(tmp_path), "--json"], capture_output=True, text=True).stdout)
+        assert r["tools_seen"] == {"mystery_edit": 1}
+        assert r["edit_tools_not_mapped"] == [{"tool": "mystery_edit", "arg_keys": ["Body", "Path"]}]
+        assert "not recognised" in r["verdict"]
+        subprocess.run(["control-eda", "probe", "off", "--project", str(tmp_path)], check=True, capture_output=True)
+        assert not (tmp_path / "evidence" / ".hook-probe").exists()

@@ -32,6 +32,19 @@ AG_WRITE_TOOLS = {"write_to_file": ("TargetFile", None, "CodeContent"),
                   "edit_file": ("TargetFile", None, "CodeContent")}
 
 
+def probe(env: str, hook: str, payload: dict, ev: dict, kind: str, reply: dict) -> None:
+    """When <cwd>/evidence/.hook-probe exists, append the raw payload and our
+    translation to evidence/hook-probe.jsonl so a real session in Cursor or
+    Antigravity shows which tool names and keys the environment really sends."""
+    cwd = Path(ev.get("cwd") or payload.get("cwd") or (payload.get("workspace_roots") or payload.get("workspacePaths") or ["."])[0])
+    marker = cwd / "evidence" / ".hook-probe"
+    if not marker.exists():
+        return
+    rec = {"env": env, "hook": hook, "kind": kind, "raw": payload, "translated": ev, "reply": reply}
+    with (cwd / "evidence" / "hook-probe.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
 def read_stdin() -> dict:
     raw = sys.stdin.read()
     try:
@@ -150,6 +163,7 @@ def main() -> None:
     ap.add_argument("hook", help="hook script name without .py, e.g. no_weaken")
     a = ap.parse_args()
     payload = read_stdin()
+    ev, kind = {}, "unknown"
     try:
         ev, kind = from_cursor(payload) if a.env == "cursor" else from_antigravity(payload)
         script = HERE / f"{a.hook}.py"
@@ -158,6 +172,10 @@ def main() -> None:
     except Exception as e:  # fail open, loudly
         sys.stderr.write(f"[dv adapt] {e}\n")
         reply = {"permission": "allow"} if a.env == "cursor" else {"decision": "allow"}
+    try:
+        probe(a.env, a.hook, payload, ev, kind, reply)
+    except Exception as e:
+        sys.stderr.write(f"[dv adapt] probe: {e}\n")
     print(json.dumps(reply))
     sys.exit(0)
 

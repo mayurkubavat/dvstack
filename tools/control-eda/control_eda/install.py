@@ -57,8 +57,12 @@ def _merge_json(path: Path, new: dict, dry: bool, log: list[str], under: str | N
         path.write_text(json.dumps(existing, indent=2) + "\n")
 
 
-def install(env: str, project: Path, global_scope: bool = False, dry_run: bool = False, plugin: Path = PLUGIN) -> dict:
+def install(env: str, project: Path, global_scope: bool = False, dry_run: bool = False, plugin: Path = PLUGIN, probe: bool = False) -> dict:
     log: list[str] = []
+    if probe and not dry_run:
+        (project / "evidence").mkdir(exist_ok=True)
+        (project / "evidence" / ".hook-probe").write_text("probe on\n")
+        log.append("probe on: evidence/hook-probe.jsonl will record every hook payload")
     if env == "cursor":
         root = (Path.home() / ".cursor") if global_scope else (project / ".cursor")
         for sub in ("skills", "agents", "commands", "rules"):
