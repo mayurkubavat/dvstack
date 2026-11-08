@@ -1,0 +1,27 @@
+# dv plugin project config. Read by control-eda and the hooks.
+[project]
+name = "fifo_block"
+rtl_globs = ["rtl/*.sv"]
+tb_globs = ["tb/*.sv"]
+top = "tb_fifo"
+
+[sim]
+tool = "verilator"            # verilator | icarus | vcs | xcelium | questa (adapters)
+sources = ["rtl/fifo.sv", "tb/tb_fifo.sv"]
+seeds = [1, 42, 9137]         # fixed seeds; dropping one is a gate weakening
+random_seeds = 3              # extra fresh seeds per dv:verify run
+pass_pattern = "TEST PASSED"
+fail_pattern = "TEST FAILED|ERROR"
+verilator_flags = ["-Wno-fatal", "-Wno-WIDTHEXPAND", "-Wno-WIDTHTRUNC"]
+
+[lint]
+tool = "verilator"            # verible when available
+sources = ["rtl/fifo.sv"]     # lint RTL strictly; the TB is checked by sim
+flags = ["-Wall", "-Wno-fatal", "-Wno-DECLFILENAME", "-Wno-UNUSEDSIGNAL", "-Wno-UNUSEDPARAM"]
+
+[cov]
+floor = 80.0                  # percent; lowering it is a gate weakening
+
+[tests.tb_fifo]
+top = "tb_fifo"
+plusargs = ["+cycles=2000"]

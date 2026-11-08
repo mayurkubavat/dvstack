@@ -1,0 +1,21 @@
+{
+  "name": "dvstack",
+  "owner": {
+    "name": "Mayur Kubavat",
+    "url": "https://github.com/mayurkubavat"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for RTL design and verification engineers: evidence-gated verification, lint promotion, formal anti-vacuity checks and agent evals.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "dv",
+      "source": "./plugins/dv",
+      "description": "Evidence gate (dv:verify), agent-readable vplan, failure triage and review-comment-to-rule promotion for DV teams.",
+      "version": "0.1.0",
+      "category": "verification",
+      "keywords": ["systemverilog", "uvm", "verilator", "coverage", "sva"]
+    }
+  ]
+}

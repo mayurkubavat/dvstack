@@ -1,0 +1,23 @@
+# sim build output
+build/
+obj_dir/
+*.vvp
+
+# evidence is per-run; commit only what a PR cites
+evidence/sim/
+evidence/*.log
+evidence/cov.json
+evidence/lint.json
+evidence/worktree.json
+evidence/.one-way-door
+
+# python
+__pycache__/
+*.egg-info/
+.pytest_cache/
+dist/
+
+# editors
+.DS_Store
+.vscode/
+.idea/

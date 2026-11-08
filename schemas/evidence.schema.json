@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mayurkubavat/dvstack/schemas/evidence.schema.json",
+  "title": "dv evidence bundle",
+  "description": "What dv:verify writes and dv-verifier reads. One file per commit under evidence/.",
+  "type": "object",
+  "required": ["version", "sha", "block", "door", "verdict", "files", "lint", "sim", "cov", "sva", "waivers_added", "claims"],
+  "properties": {
+    "version": { "const": 1 },
+    "sha": { "type": "string", "minLength": 7 },
+    "base_sha": { "type": ["string", "null"] },
+    "block": { "type": "string" },
+    "door": { "enum": ["two-way", "one-way"] },
+    "verdict": { "enum": ["PASS", "FAIL", "INCONCLUSIVE"] },
+    "generated_at": { "type": "string" },
+    "files": { "type": "array", "items": { "type": "string" } },
+    "lint": {
+      "type": "object",
+      "required": ["tool", "errors", "warnings"],
+      "properties": {
+        "tool": { "type": "string" },
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "log": { "type": "string" }
+      }
+    },
+    "sim": {
+      "type": "object",
+      "required": ["tool", "runs", "failed"],
+      "properties": {
+        "tool": { "type": "string" },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["test", "seed", "status"],
+            "properties": {
+              "test": { "type": "string" },
+              "seed": { "type": "integer" },
+              "status": { "enum": ["pass", "fail", "error"] },
+              "expect_fail": { "type": "boolean" },
+              "defines": { "type": "array", "items": { "type": "string" } },
+              "log": { "type": "string" },
+              "wave": { "type": ["string", "null"] },
+              "fail_time": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "failed": { "type": "integer", "minimum": 0 },
+        "failures": { "type": "array" }
+      }
+    },
+    "cov": {
+      "type": "object",
+      "required": ["before", "after", "excluded_bins_added"],
+      "properties": {
+        "tool": { "type": "string" },
+        "before": { "type": ["number", "null"] },
+        "after": { "type": ["number", "null"] },
+        "floor": { "type": ["number", "null"] },
+        "excluded_bins_added": { "type": "integer", "minimum": 0 },
+        "report": { "type": "string" }
+      }
+    },
+    "sva": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "cover", "mutation"],
+        "properties": {
+          "name": { "type": "string" },
+          "file": { "type": "string" },
+          "proof": { "enum": ["pass", "fail", "not_run"] },
+          "cover": { "enum": ["hit", "not_hit", "missing"] },
+          "mutation": { "enum": ["caught", "missed", "not_available"] },
+          "fault": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "waivers_added": { "type": "integer", "minimum": 0 },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "label"],
+        "properties": {
+          "text": { "type": "string" },
+          "label": { "enum": ["measured", "inferred", "guessed"] }
+        }
+      }
+    },
+    "gaps": { "type": "array", "items": { "type": "string" } }
+  }
+}

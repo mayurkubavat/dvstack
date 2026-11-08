@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mayurkubavat/dvstack/schemas/door-policy.schema.json",
+  "title": "dv door policy",
+  "description": "Which edits are one-way doors (human merge required). Everything else is two-way.",
+  "type": "object",
+  "required": ["one_way"],
+  "properties": {
+    "one_way": {
+      "type": "object",
+      "properties": {
+        "paths": { "type": "array", "items": { "type": "string" }, "description": "glob patterns, matched against the repo-relative path" },
+        "patterns": { "type": "array", "items": { "type": "string" }, "description": "regexes; a change in match count between old and new text marks the edit one-way" }
+      }
+    }
+  }
+}

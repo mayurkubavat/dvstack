@@ -1,0 +1,23 @@
+version: 1
+block: fifo
+features:
+  - id: fifo.flags
+    summary: full and empty track occupancy exactly and are never both set
+    rtl: [rtl/fifo.sv]
+    tests: [tb_fifo]
+    covergroups: []
+    assertions: [a_full_empty_excl, a_no_overflow]
+    covers: [c_full, c_push_when_full]
+    faults: [FIFO_BUG_FULL_EARLY]
+    door: two-way
+    status: written
+  - id: fifo.push_pop
+    summary: data pushed is popped in the same order, one entry per pop
+    rtl: [rtl/fifo.sv]
+    tests: [tb_fifo]
+    covergroups: []
+    assertions: []
+    covers: []
+    faults: [FIFO_BUG_DOUBLE_POP]
+    door: two-way
+    status: written

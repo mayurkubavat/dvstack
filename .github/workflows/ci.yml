@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install simulators
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends verilator iverilog
+      - name: Install control-eda
+        run: pip install -e "tools/control-eda[dev]"
+      - name: Validate plugin manifests
+        run: |
+          python -c "import json,sys; [json.load(open(p)) for p in ['.claude-plugin/marketplace.json','plugins/dv/.claude-plugin/plugin.json','plugins/dv/hooks/hooks.json']]"
+      - name: Run tests
+        run: pytest -q tests
+      - name: Evidence gate on the example block
+        working-directory: examples/fifo_block
+        run: control-eda verify --claim "[measured] CI run of the reference FIFO"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fifo-evidence
+          path: examples/fifo_block/evidence/

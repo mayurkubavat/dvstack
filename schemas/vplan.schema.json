@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mayurkubavat/dvstack/schemas/vplan.schema.json",
+  "title": "dv verification plan",
+  "type": "object",
+  "required": ["version", "block", "features"],
+  "properties": {
+    "version": { "const": 1 },
+    "block": { "type": "string" },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary", "rtl", "tests", "door", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$" },
+          "summary": { "type": "string", "maxLength": 160 },
+          "rtl": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "tests": { "type": "array", "items": { "type": "string" } },
+          "covergroups": { "type": "array", "items": { "type": "string" } },
+          "assertions": { "type": "array", "items": { "type": "string" } },
+          "covers": { "type": "array", "items": { "type": "string" } },
+          "faults": { "type": "array", "items": { "type": "string" } },
+          "door": { "enum": ["two-way", "one-way"] },
+          "status": { "enum": ["planned", "written", "verified"] },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

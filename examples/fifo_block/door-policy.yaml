@@ -1,0 +1,14 @@
+# One-way doors: changes a human must merge. Everything else is two-way.
+one_way:
+  paths:
+    - "**/csr/**"
+    - "**/regs/**"
+    - "**/*_regmap*"
+    - "**/waivers/**"
+    - "**/*.waiver"
+    - "**/eco/**"
+  patterns:
+    - '^\s*(input|output|inout)\b'            # port list
+    - '\bmodule\s+\w+\s*#?\s*\('              # module header / parameters
+    - '\balways_ff\s*@\s*\(\s*posedge\s+\w*clk'  # clock domain added or removed
+    - '\bnegedge\s+rst'                       # reset tree
