@@ -26,6 +26,14 @@ pip install -e dvstack/tools/control-eda
 
 Verilator (or Icarus) must be on `PATH`. Commercial simulators plug in as adapters.
 
+Cursor and Google Antigravity are supported too; see
+[docs/environments.md](docs/environments.md):
+
+```bash
+control-eda install --env cursor        # writes .cursor/ in the current project
+control-eda install --env antigravity   # writes .agents/ in the current project
+```
+
 ## Set up a project
 
 Two files at the project root, both agent-readable:
@@ -68,13 +76,14 @@ Break the RTL and the same command says `FAIL`. Remove a `cover` and it says
 | Skill | `dv:correct` | Turn a repeated review comment into a lint rule, assertion, hook or CI check |
 | Skill | `dv:create-verify-skill` | Generate a project-local verify skill for one IP (Launch, Doctor, Drive, Evidence, Cleanup, Helpers) |
 | Agent | `dv-verifier` | Clean-context rerun of the bundle: VERIFIED, NOT VERIFIED or INCONCLUSIVE |
-| Commands | `/dv-mode`, `/dv-verify`, `/why-fail`, `/correct`, `/dv-doctor` | Playbook router and entry points |
-| Hooks | `no-weaken`, `door-check`, `lint-on-save`, `evidence-gate`, `session-doctor`, `human-relay` | The rules the agent cannot skip |
+| Commands | `/dv-mode`, `/dv-verify`, `/dv-doctor` | Playbook router and entry points; skills are also callable as `/dv:verify`, `/dv:why-fail`, `/dv:correct` |
+| Hooks | `no-weaken`, `door-check`, `lint-on-save`, `evidence-gate`, `session-doctor`, `human-relay` | The rules the agent cannot skip; `hooks/adapt.py` runs the same scripts under Cursor and Antigravity |
+| Rules | `dv-gate` | Always-on rule file for environments where hooks are weaker |
 
 ### control-eda
 
 ```
-control-eda doctor | lint | sim | cov | wave-query | vplan | scope | door | verify | evidence
+control-eda doctor | lint | sim | cov | wave-query | vplan | scope | door | verify | evidence | install
 ```
 
 `--json` on everything. `wave-query` turns a VCD or FST into a cycle table around a

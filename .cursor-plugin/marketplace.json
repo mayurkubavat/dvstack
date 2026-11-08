@@ -1,0 +1,11 @@
+{
+  "name": "dvstack",
+  "owner": { "name": "Mayur Kubavat", "url": "https://github.com/mayurkubavat" },
+  "metadata": {
+    "description": "Plugins for RTL design and verification engineers: evidence-gated verification, lint promotion, formal anti-vacuity checks and agent evals.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    { "name": "dv", "source": "./plugins/dv" }
+  ]
+}

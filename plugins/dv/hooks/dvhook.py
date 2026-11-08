@@ -45,6 +45,8 @@ def tool_new_text(event: dict) -> str:
     ti = event.get("tool_input") or {}
     if "content" in ti:
         return ti.get("content") or ""
+    if "contents" in ti:
+        return ti.get("contents") or ""
     if "new_string" in ti:
         return ti.get("new_string") or ""
     if "edits" in ti:

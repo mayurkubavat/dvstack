@@ -7,7 +7,10 @@ repo, several plugins, one shared CLI.
 
 - `.claude-plugin/marketplace.json`: the marketplace; lists every plugin under `plugins/`.
 - `plugins/<name>/`: one plugin each. `skills/<skill>/SKILL.md`, `agents/*.md`,
-  `commands/*.md`, `hooks/hooks.json` + `hooks/*.py`. Skills are invoked as `<plugin>:<skill>`.
+  `commands/*.md`, `rules/*.md`, `hooks/hooks.json` + `hooks/*.py`. Skills are invoked as `<plugin>:<skill>`.
+  A command must not share a name with a skill (Claude Code lists both as skills and shows duplicates).
+- Cursor: `.cursor-plugin/` manifests mirror `.claude-plugin/`; hooks go through `hooks/adapt.py`
+  (`hooks/cursor-hooks.json`). Antigravity: `control-eda install --env antigravity`. See `docs/environments.md`.
 - `tools/control-eda/`: Python CLI every skill and hook calls. `pip install -e tools/control-eda`.
 - `schemas/`: JSON schemas for `evidence`, `vplan` and `door-policy` files.
 - `examples/fifo_block/`: the reference project every test runs against. Has

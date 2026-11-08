@@ -13,6 +13,7 @@ from . import cov as covmod
 from . import doctor as doctormod
 from . import door as doormod
 from . import evidence as evmod
+from . import install as installmod
 from . import lint as lintmod
 from . import sim as simmod
 from . import verify as verifymod
@@ -94,6 +95,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--keep", action="store_true", help="keep previous sim results instead of starting clean")
     sp.add_argument("--quiet", action="store_true")
 
+    sp = common(sub.add_parser("install", help="install the dv plugin into a Cursor or Antigravity project folder"))
+    sp.add_argument("--env", choices=["cursor", "antigravity"], required=True)
+    sp.add_argument("--project", default=".", help="project root (default: current directory)")
+    sp.add_argument("--global", dest="global_scope", action="store_true", help="user-level install instead of the project")
+    sp.add_argument("--dry-run", action="store_true")
+
     sp = common(sub.add_parser("evidence", help="bundle | check the evidence file"))
     sp.add_argument("action", choices=["bundle", "check"])
     sp.add_argument("path", nargs="?", help="for check: the bundle to validate")
@@ -115,6 +122,10 @@ def main(argv: list[str] | None = None) -> None:
             d = doctormod.run_doctor(start)
             emit(d, as_json, doctormod.text_report(d))
             sys.exit(0 if d["ok"] else 1)
+        if args.cmd == "install":
+            r = installmod.install(args.env, Path(args.project).resolve(), args.global_scope, args.dry_run)
+            emit(r, as_json, f"{'would install' if args.dry_run else 'installed'} dv for {args.env} under {r['root']}\n" + "\n".join("  " + a for a in r["actions"]) + "\n" + "\n".join("note: " + n for n in r["notes"]))
+            return
         if args.cmd == "wave-query":
             r = wavemod.query(Path(args.dump), parse_time(args.at), args.window, [s.strip() for s in args.signals.split(",")], args.clock)
             emit(r, as_json, wavemod.table(r))

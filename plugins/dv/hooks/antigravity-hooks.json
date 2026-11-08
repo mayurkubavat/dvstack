@@ -1,0 +1,28 @@
+{
+  "dv-gate": {
+    "enabled": true,
+    "SessionStart": [
+      { "command": "python3 .agents/hooks/dv/adapt.py --env antigravity session_doctor", "timeout": 30 }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "command": "python3 .agents/hooks/dv/adapt.py --env antigravity no_weaken", "timeout": 15 },
+          { "command": "python3 .agents/hooks/dv/adapt.py --env antigravity door_check", "timeout": 15 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "command": "python3 .agents/hooks/dv/adapt.py --env antigravity lint_on_save", "timeout": 60 }
+        ]
+      }
+    ],
+    "Stop": [
+      { "command": "python3 .agents/hooks/dv/adapt.py --env antigravity evidence_gate", "timeout": 30 }
+    ]
+  }
+}

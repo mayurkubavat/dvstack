@@ -1,0 +1,12 @@
+{
+  "name": "dv",
+  "version": "0.1.0",
+  "description": "Evidence-gated design verification: dv:verify refuses to call a change done until lint, simulation, coverage and anti-vacuity results exist on disk.",
+  "author": { "name": "Mayur Kubavat", "url": "https://github.com/mayurkubavat" },
+  "homepage": "https://github.com/mayurkubavat/dvstack",
+  "repository": "https://github.com/mayurkubavat/dvstack",
+  "license": "MIT",
+  "keywords": ["dv", "rtl", "systemverilog", "verilator", "uvm", "coverage", "sva"],
+  "hooks": "./hooks/cursor-hooks.json",
+  "rules": "./rules"
+}

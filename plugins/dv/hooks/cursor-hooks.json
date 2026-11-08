@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "python3 ./hooks/adapt.py --env cursor session_doctor" }
+    ],
+    "preToolUse": [
+      { "command": "python3 ./hooks/adapt.py --env cursor no_weaken", "matcher": "Write|Edit|StrReplace|str_replace|edit_file|write_file" },
+      { "command": "python3 ./hooks/adapt.py --env cursor door_check", "matcher": "Write|Edit|StrReplace|str_replace|edit_file|write_file" }
+    ],
+    "afterFileEdit": [
+      { "command": "python3 ./hooks/adapt.py --env cursor lint_on_save" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "python3 ./hooks/adapt.py --env cursor human_relay_check" }
+    ],
+    "stop": [
+      { "command": "python3 ./hooks/adapt.py --env cursor evidence_gate" }
+    ]
+  }
+}
