@@ -1,0 +1,13 @@
+{
+  "name": "rtl",
+  "version": "0.1.0",
+  "description": "Multi-model RTL review for clock domain crossings, resets and X-propagation: a tool-free structural scan, two or three reviewers on different models, and a merge that sends every disagreement to a human.",
+  "author": {
+    "name": "Mayur Kubavat",
+    "url": "https://github.com/mayurkubavat"
+  },
+  "homepage": "https://github.com/mayurkubavat/dvstack",
+  "repository": "https://github.com/mayurkubavat/dvstack",
+  "license": "MIT",
+  "keywords": ["rtl", "review", "cdc", "reset", "x-propagation", "systemverilog"]
+}

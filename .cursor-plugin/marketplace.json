@@ -16,6 +16,10 @@
     {
       "name": "formal",
       "source": "./plugins/formal"
+    },
+    {
+      "name": "rtl",
+      "source": "./plugins/rtl"
     }
   ]
 }

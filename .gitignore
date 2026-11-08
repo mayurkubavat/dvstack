@@ -11,6 +11,9 @@ obj_dir/
 **/evidence/worktree.json
 **/evidence/formal.json
 **/evidence/equiv.json
+**/evidence/review-scan.json
+**/evidence/review.json
+**/evidence/review.md
 **/evidence/.one-way-door
 **/evidence/.hook-probe
 **/evidence/hook-probe.jsonl

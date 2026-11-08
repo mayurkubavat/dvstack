@@ -20,6 +20,8 @@ control-eda formal detect --json          # which formal / equivalence tools thi
 control-eda formal check --json           # proof, cover witnesses, fault counterexamples, assume audit
 control-eda equiv --base HEAD --json      # working tree equivalent to HEAD?
 control-eda rules test --json             # rules.yaml: does every rule fire on its bad examples?
+control-eda review scan --base main --json  # CDC / reset / X-prop structural scan, no EDA tool needed
+control-eda review merge --json           # merge reviews/*.json into agreed / contested / single findings
 ```
 
 Open-source tools first: Verilator for lint, sim and coverage; Icarus as a sim

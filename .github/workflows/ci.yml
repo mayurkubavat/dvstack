@@ -19,7 +19,7 @@ jobs:
         run: pip install -e "tools/control-eda[dev]"
       - name: Validate plugin manifests
         run: |
-          python -c "import json,sys; [json.load(open(p)) for p in ['.claude-plugin/marketplace.json','.cursor-plugin/marketplace.json','plugins/dv/.claude-plugin/plugin.json','plugins/dv/hooks/hooks.json','plugins/formal/.claude-plugin/plugin.json','plugins/formal/.cursor-plugin/plugin.json']]"
+          python -c "import json,sys; [json.load(open(p)) for p in ['.claude-plugin/marketplace.json','.cursor-plugin/marketplace.json','plugins/dv/.claude-plugin/plugin.json','plugins/dv/hooks/hooks.json','plugins/formal/.claude-plugin/plugin.json','plugins/formal/.cursor-plugin/plugin.json','plugins/rtl/.claude-plugin/plugin.json','plugins/rtl/.cursor-plugin/plugin.json','schemas/review.schema.json']]"
       - name: Run tests
         run: pytest -q tests
       - name: Formal gate on the example block

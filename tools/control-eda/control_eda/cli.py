@@ -21,6 +21,7 @@ from . import verify as verifymod
 from . import vplan as vplanmod
 from . import wave as wavemod
 from . import rules as rulesmod
+from . import review as reviewmod
 from .formal import check as formalmod
 from .formal import equiv as equivmod
 from .util import emit, fail, parse_time
@@ -41,6 +42,8 @@ examples:
   control-eda formal check --json
   control-eda equiv --base main --json
   control-eda rules test --json
+  control-eda review scan --base main --json
+  control-eda review merge reviews/*.json --json
 """
 
 
@@ -121,6 +124,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("action", choices=["list", "check", "test"])
     sp.add_argument("--files", nargs="*")
 
+    sp = common(sub.add_parser("review", help="RTL review evidence: scan (CDC, reset, X-prop; no EDA tool needed) | merge reviewer findings"))
+    sp.add_argument("action", choices=["scan", "merge"])
+    sp.add_argument("reviews", nargs="*", help="merge: reviewer JSON files (default reviews/*.json)")
+    sp.add_argument("--base", help="scan: only files changed since this ref")
+    sp.add_argument("--files", nargs="*")
+    sp.add_argument("--window", type=int, help="merge: lines apart that still count as the same finding (default [review].line_window or 3)")
+    sp.add_argument("--no-scan", action="store_true", help="merge: ignore evidence/review-scan.json")
+
     sp = common(sub.add_parser("install", help="install the dv plugin into a Cursor or Antigravity project folder"))
     sp.add_argument("--env", choices=["cursor", "antigravity"], required=True)
     sp.add_argument("--plugins", default="all", help="comma list of plugins to install (default: all, e.g. dv,formal)")
@@ -195,6 +206,20 @@ def main(argv: list[str] | None = None) -> None:
             r = equivmod.run_equiv(cfg, args.base, args.files, args.backend, args.top)
             emit(r, as_json, equivmod.text_report(r))
             sys.exit(0 if r["verdict"] == "PASS" else 1)
+        if args.cmd == "review":
+            if args.action == "scan":
+                r = reviewmod.scan(cfg, args.files, args.base)
+                txt = f"review scan: {len(r['findings'])} findings ({r['high']} high) in {len(r['files'])} files" + "".join(
+                    f"\n  {f['file']}:{f['line']} {f['category']}/{f['severity']} [{f['rule']}] {f['message']}" for f in r["findings"]) + "".join(
+                    f"\n  tool {t['name']}: {'ok' if t['available'] else 'missing (' + t.get('install', '') + ')'}" for t in r["tools"])
+                emit(r, as_json, txt)
+                return
+            paths = [Path(p) for p in args.reviews] or sorted((cfg.root / "reviews").glob("*.json"))
+            if not paths:
+                fail("no reviewer files", "write reviews/<reviewer>.json (schemas/review.schema.json) or pass paths", as_json)
+            r = reviewmod.merge(cfg, paths, args.window, not args.no_scan)
+            emit(r, as_json, reviewmod.markdown(r))
+            sys.exit(0 if r["ok"] else 1)
         if args.cmd == "rules":
             if args.action == "list":
                 r = rulesmod.list_rules(cfg)

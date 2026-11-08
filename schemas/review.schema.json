@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mayurkubavat/dvstack/schemas/review.schema.json",
+  "title": "one reviewer's RTL review findings",
+  "description": "Written by each rtl reviewer agent to reviews/<reviewer>.json; read by control-eda review merge.",
+  "type": "object",
+  "required": [
+    "reviewer",
+    "model",
+    "findings"
+  ],
+  "properties": {
+    "reviewer": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string",
+      "description": "model the reviewer ran on; equal models across reviewers make agreement weak"
+    },
+    "base": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "file",
+          "line",
+          "category",
+          "severity",
+          "claim"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "category": {
+            "enum": [
+              "cdc",
+              "reset",
+              "xprop",
+              "other"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "claim": {
+            "type": "string",
+            "description": "what is wrong, in one sentence"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "what the reviewer read or ran: the lines, the scan finding id, a sim or formal result"
+          },
+          "label": {
+            "enum": [
+              "measured",
+              "inferred",
+              "guessed"
+            ]
+          },
+          "fix": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cleared": {
+      "type": "array",
+      "description": "places the reviewer looked at and judged correct; a finding elsewhere in the same place becomes contested",
+      "items": {
+        "type": "object",
+        "required": [
+          "file",
+          "line",
+          "claim"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "category": {
+            "enum": [
+              "cdc",
+              "reset",
+              "xprop",
+              "other"
+            ]
+          },
+          "claim": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

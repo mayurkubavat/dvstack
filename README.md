@@ -19,6 +19,7 @@ Code, with the formal and simulation layers hardware teams already own.
 /plugin marketplace add mayurkubavat/dvstack
 /plugin install dv@dvstack
 /plugin install formal@dvstack     # optional: formal gate, equivalence, review-to-rule
+/plugin install rtl@dvstack        # optional: multi-model RTL review (CDC, reset, X-prop)
 
 # the CLI the plugin drives (once per machine)
 git clone https://github.com/mayurkubavat/dvstack
@@ -36,7 +37,7 @@ Cursor and Google Antigravity are supported too; see
 ```bash
 control-eda install --env cursor        # writes .cursor/ in the current project (all plugins)
 control-eda install --env antigravity   # writes .agents/ in the current project
-control-eda install --env cursor --plugins dv,formal
+control-eda install --env cursor --plugins dv,formal,rtl
 ```
 
 ## Set up a project
@@ -159,11 +160,45 @@ native SVA backend; on free Yosys they are reported `unsupported`, so the gate s
 `tool_missing` with the install command. `CONTROL_EDA_HIDE_TOOLS=yosys,sby` shows
 what a user without those tools would see.
 
+## What is in the `rtl` plugin
+
+One model reviewing a diff finds what that model tends to find. `rtl:review` runs
+two or three reviewers on different models, blind to each other, over the same
+evidence, then merges their findings so agreement is visible and every
+disagreement goes to a human.
+
+```bash
+control-eda review scan --base main --json   # evidence/review-scan.json, no EDA tool needed
+# reviewers write reviews/<reviewer>.json   (schemas/review.schema.json)
+control-eda review merge --json              # evidence/review.json + review.md for the PR
+```
+
+The scan is a structural pass in plain Python: clock domains, signals crossing
+them, two-flop synchronizers, multi-bit buses through flop synchronizers, async
+resets not tested first, resets shared across domains, `casex`, `===`, X assigns
+and combinational `case` without `default`. Verilator lint warnings on the same
+topics are added when Verilator is installed, and a site CDC tool (SpyGlass,
+Questa CDC, Meridian) is added through `[review.tools.<name>]` in `dv.toml`. It is
+a heuristic starting list for the reviewers, not a CDC sign-off.
+
+Each merged finding is `agreed`, `majority`, `single`, `contested` (one reviewer
+raised it, another cleared it) or `single_model` (every reviewer ran on one model,
+which is what Antigravity gives you). Medium and high scan findings no reviewer
+raised are listed as `tool_only`. The verdict is `CHANGES_REQUESTED`,
+`NEEDS_HUMAN`, `COMMENTS` or `CLEAN`.
+
+| Kind | Name | What |
+| --- | --- | --- |
+| Skill | `rtl:review` | Scan, run the reviewers in parallel, merge, report the disagreements first |
+| Agents | `rtl-reviewer-a/b/c` | One prompt, three models (opus, sonnet, haiku); a test keeps the prompts identical |
+| Rules | `rtl-review` | Always-on rule file for Cursor and Antigravity |
+
 ### control-eda
 
 ```
 control-eda doctor | lint | sim | cov | wave-query | vplan | scope | door | verify | evidence | install
 control-eda formal detect | formal check | equiv --base <ref> | rules list | rules check | rules test
+control-eda review scan | review merge
 ```
 
 `--json` on everything. `wave-query` turns a VCD or FST into a cycle table around a
@@ -182,7 +217,7 @@ marks the session and `control-eda door classify` records it in the bundle.
 
 ## Roadmap
 
-- `rtl` plugin: multi-model RTL review for CDC, reset and X-propagation.
+- `rtl`: presets for SpyGlass CDC, Questa CDC and Meridian once checked on licensed installs.
 - `formal`: confirm the JasperGold, VC Formal, Questa, Conformal and Formality templates on licensed installs.
 - `dv-evals` plugin: blinded evals of the skills on historical bugs, across models.
 

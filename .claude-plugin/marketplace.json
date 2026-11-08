@@ -37,6 +37,20 @@
         "equivalence",
         "lec"
       ]
+    },
+    {
+      "name": "rtl",
+      "source": "./plugins/rtl",
+      "description": "Multi-model RTL review for CDC, reset and X-propagation: a tool-free structural scan, reviewers on different models, and a merge that sends disagreements to a human.",
+      "version": "0.1.0",
+      "category": "design",
+      "keywords": [
+        "rtl",
+        "review",
+        "cdc",
+        "reset",
+        "x-propagation"
+      ]
     }
   ]
 }
