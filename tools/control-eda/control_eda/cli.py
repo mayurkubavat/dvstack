@@ -22,6 +22,7 @@ from . import vplan as vplanmod
 from . import wave as wavemod
 from . import rules as rulesmod
 from . import review as reviewmod
+from . import triage as triagemod
 from .formal import check as formalmod
 from .formal import equiv as equivmod
 from .util import emit, fail, parse_time
@@ -44,6 +45,9 @@ examples:
   control-eda rules test --json
   control-eda review scan --base main --json
   control-eda review merge reviews/*.json --json
+  control-eda triage run --regress 20 --json
+  control-eda triage run --logs 'nightly/*.log' --main origin/main --json
+  control-eda triage record --sig 3f2a9c1e07 --status open --link https://github.com/org/repo/pull/12
 """
 
 
@@ -71,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--expect-fail", action="store_true", help="fault injection: the run must FAIL to be ok")
     sp.add_argument("--compile-only", action="store_true")
     sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--plusarg", action="append", default=[], help="override or add a plusarg, e.g. +cycles=40 (repeatable)")
 
     sp = common(sub.add_parser("cov", help="coverage: report | diff | clean"))
     sp.add_argument("action", choices=["report", "merge", "diff", "clean"])
@@ -131,6 +136,23 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--files", nargs="*")
     sp.add_argument("--window", type=int, help="merge: lines apart that still count as the same finding (default [review].line_window or 3)")
     sp.add_argument("--no-scan", action="store_true", help="merge: ignore evidence/review-scan.json")
+
+    sp = common(sub.add_parser("triage", help="regression triage: run (bucket failures by signature, check main, shrink) | record | list"))
+    sp.add_argument("action", choices=["run", "record", "list"])
+    sp.add_argument("--logs", nargs="*", help="run: triage these simulator logs (globs) instead of evidence/sim")
+    sp.add_argument("--sim-dir", help="run: read failing runs from this directory of control-eda sim JSON (default evidence/sim)")
+    sp.add_argument("--regress", type=int, metavar="N", help="run: first run every test on the fixed seeds plus N random seeds")
+    sp.add_argument("--tests", nargs="*", help="run --regress: only these tests")
+    sp.add_argument("--define", action="append", default=[], help="run --regress: +define for every run")
+    sp.add_argument("--main", help="run: ref to recheck failures on (default [triage].main or main)")
+    sp.add_argument("--no-main", action="store_true", help="run: skip the rerun on main")
+    sp.add_argument("--no-shrink", action="store_true", help="run: skip shrinking")
+    sp.add_argument("--no-repro", action="store_true", help="run: skip reproducing here")
+    sp.add_argument("--sig", help="record: signature id")
+    sp.add_argument("--status", choices=list(triagemod.STORE_STATUSES), help="record: open (owned by a PR or issue) | fixed (merged)")
+    sp.add_argument("--link", help="record: PR or issue URL")
+    sp.add_argument("--note")
+    sp.add_argument("--text", help="record: normalized error line, for a signature not in triage/latest.json")
 
     sp = common(sub.add_parser("install", help="install the dv plugin into a Cursor or Antigravity project folder"))
     sp.add_argument("--env", choices=["cursor", "antigravity"], required=True)
@@ -220,6 +242,26 @@ def main(argv: list[str] | None = None) -> None:
             r = reviewmod.merge(cfg, paths, args.window, not args.no_scan)
             emit(r, as_json, reviewmod.markdown(r))
             sys.exit(0 if r["ok"] else 1)
+        if args.cmd == "triage":
+            if args.action == "run":
+                prog = None if as_json else (lambda m: print(f"  ... {m}", file=sys.stderr))
+                r = triagemod.run(cfg, logs=args.logs, sim_dir=Path(args.sim_dir) if args.sim_dir else None, regress_n=args.regress, tests=args.tests,
+                                  defines=args.define, main_ref=args.main, do_main=not args.no_main, do_shrink=not args.no_shrink,
+                                  do_repro=not args.no_repro, progress=prog)
+                emit(r, as_json, triagemod.text_report(r))
+                sys.exit(0 if r["ok"] else 1)
+            if args.action == "record":
+                if not (args.sig and args.status):
+                    fail("triage record needs --sig and --status", "control-eda triage record --sig <id> --status open --link <url>", as_json)
+                try:
+                    r = triagemod.record(cfg, args.sig, args.status, args.link, args.note, args.text)
+                except ValueError as e:
+                    fail(str(e), as_json=as_json)
+                emit(r, as_json, f"{r['signature']}: {r['entry']['status']}" + (f" ({r['entry'].get('link')})" if r["entry"].get("link") else "") + f" -> {r['store']}")
+                return
+            st = triagemod.load_store(cfg)
+            emit({"ok": True, **st}, as_json, "\n".join(f"{k} {v.get('status'):6} {v.get('text')}" + (f"  {v['link']}" if v.get("link") else "") for k, v in st["signatures"].items()) or "no known signatures")
+            return
         if args.cmd == "rules":
             if args.action == "list":
                 r = rulesmod.list_rules(cfg)
@@ -239,10 +281,9 @@ def main(argv: list[str] | None = None) -> None:
             emit(r, as_json, txt if r.get("ok") is not None else json.dumps(r))
             sys.exit(0 if r.get("ok") else 1)
         if args.cmd == "sim":
-            r = simmod.run_test(cfg, args.test, args.seed, args.define, args.cov, args.trace, args.expect_fail, args.dry_run, args.compile_only)
+            r = simmod.run_test(cfg, args.test, args.seed, args.define, args.cov, args.trace, args.expect_fail, args.dry_run, args.compile_only, args.plusarg)
             if not args.dry_run and not args.compile_only and r.get("status") in ("pass", "fail"):
-                tag = f"{r['test']}_{r['seed']}" + ("_" + "_".join(r["defines"]) if r["defines"] else "")
-                (cfg.evidence_dir / "sim" / f"{tag}.json").write_text(json.dumps(r, indent=2))
+                Path(cfg.root / r["log"]).with_suffix(".json").write_text(json.dumps(r, indent=2))
             txt = f"{r['test']} seed={r['seed']} {r.get('status','?').upper()}" + (" (expected fail: ok)" if args.expect_fail and r.get("ok") else "") + (f"\n  {r['first_failure']}" if r.get("first_failure") else "") + (f"\n  wave: {r['wave']}" if r.get("wave") else "")
             emit(r, as_json, txt)
             sys.exit(0 if r.get("ok") else 1)

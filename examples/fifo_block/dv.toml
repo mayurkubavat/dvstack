@@ -42,3 +42,10 @@ backend = "auto"              # auto | eqy | yosys | conformal | formality | <cu
 [tests.tb_fifo]
 top = "tb_fifo"
 plusargs = ["+cycles=2000"]
+
+[triage]
+# Read by `control-eda triage run` (dv:triage). Decides what people are shown, never what the gate checks.
+# main = "origin/main"        # ref a failure is rerun on (default: origin/main if it exists, else main)
+shrink_plusarg = "cycles"     # bisected down to the shortest run that fails the same way
+store = "triage/signatures.json"
+pin_seeds = false             # true: a triage draft PR also adds the shrunk seed to [sim].seeds

@@ -11,7 +11,7 @@ from pathlib import Path
 from .config import Config, ConfigError
 from .util import run, which
 
-FAIL_TIME_RE = re.compile(r"@\s*(\d+)(\s*(?:ps|ns|us))?")
+FAIL_TIME_RE = re.compile(r"@\s*(\d+)(\s*(?:ps|ns|us))?|^\s*\[\s*(\d+)(\s*(?:ps|ns|us))?\]")
 
 
 def _build_key(cfg: Config, defines: list[str]) -> str:
@@ -70,8 +70,28 @@ def compile_icarus(cfg: Config, top: str, defines: list[str], log: Path) -> tupl
     return out_vvp, {"ok": True, "cached": False, "seconds": round(secs, 1)}
 
 
-def run_test(cfg: Config, test: str, seed: int | str, defines: list[str] | None = None, cov: bool = False, trace: bool = False, expect_fail: bool = False, dry_run: bool = False, compile_only: bool = False) -> dict:
+def _plusarg_name(a: str) -> str:
+    return a.lstrip("+").split("=", 1)[0]
+
+
+def merge_plusargs(base: list[str], overrides: list[str]) -> list[str]:
+    """Replace same-name plusargs in place (simulators take the first match), append the rest."""
+    names = {_plusarg_name(o): o for o in overrides}
+    out = [names.pop(_plusarg_name(a)) if _plusarg_name(a) in names else a for a in base]
+    return out + list(names.values())
+
+
+def plusarg_value(cfg: Config, test: str, name: str) -> str | None:
+    for a in [*cfg.test(test).get("plusargs", []), *cfg.sim.get("plusargs", [])]:
+        if _plusarg_name(a) == name and "=" in a:
+            return a.split("=", 1)[1]
+    return None
+
+
+def run_test(cfg: Config, test: str, seed: int | str, defines: list[str] | None = None, cov: bool = False, trace: bool = False, expect_fail: bool = False, dry_run: bool = False, compile_only: bool = False, plusargs: list[str] | None = None) -> dict:
+    """`plusargs` override or extend the test's own: `+cycles=40` replaces `+cycles=2000`."""
     defines = list(defines or [])
+    overrides = [a if a.startswith("+") else "+" + a for a in (plusargs or [])]
     tcfg = cfg.test(test)
     top = tcfg.get("top") or cfg.project.get("top")
     if not top:
@@ -82,14 +102,14 @@ def run_test(cfg: Config, test: str, seed: int | str, defines: list[str] | None 
     tool = cfg.sim.get("tool", "verilator")
     sim_dir = cfg.evidence_dir / "sim"
     sim_dir.mkdir(exist_ok=True)
-    tag = f"{test}_{seed}" + ("_" + "_".join(defines) if defines else "")
+    tag = f"{test}_{seed}" + ("_" + "_".join(defines) if defines else "") + "".join("_" + re.sub(r"\W+", "", a) for a in overrides)
     log = sim_dir / f"{tag}.log"
     build_log = sim_dir / f"build_{top}{'_' + '_'.join(defines) if defines else ''}.log"
     wave = sim_dir / f"{tag}.vcd"
-    plusargs = [f"+seed={seed}", *tcfg.get("plusargs", []), *cfg.sim.get("plusargs", [])]
+    plusargs = merge_plusargs([f"+seed={seed}", *tcfg.get("plusargs", []), *cfg.sim.get("plusargs", [])], overrides)
     if trace:
         plusargs.append("+trace")
-    result: dict = {"test": test, "seed": seed, "defines": defines, "tool": tool, "expect_fail": expect_fail, "log": str(log.relative_to(cfg.root))}
+    result: dict = {"test": test, "seed": seed, "defines": defines, "plusargs": overrides, "tool": tool, "expect_fail": expect_fail, "log": str(log.relative_to(cfg.root))}
 
     if tool == "verilator":
         if dry_run:
@@ -143,7 +163,7 @@ def run_test(cfg: Config, test: str, seed: int | str, defines: list[str] | None 
             first_fail = line.strip()
             m = FAIL_TIME_RE.search(line)
             if m:
-                fail_time = m.group(1) + (m.group(2) or "").strip()
+                fail_time = (m.group(1) or m.group(3)) + (m.group(2) or m.group(4) or "").strip()
             break
     ok = (raw_status == "fail") if expect_fail else (raw_status == "pass")
     result.update({

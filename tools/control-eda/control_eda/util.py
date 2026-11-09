@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,11 @@ from pathlib import Path
 
 
 def which(name: str) -> str | None:
+    """shutil.which, except tools in CONTROL_EDA_HIDE_TOOLS (comma list) count as absent, so
+    CONTROL_EDA_HIDE_TOOLS=verilator shows what every command does on a machine without it."""
+    hidden = {x.strip() for x in os.environ.get("CONTROL_EDA_HIDE_TOOLS", "").split(",") if x.strip()}
+    if name in hidden or Path(name).name in hidden:
+        return None
     return shutil.which(name)
 
 

@@ -87,12 +87,39 @@ Break the RTL and the same command says `FAIL`. Remove a `cover` and it says
 | Skill | `dv:verify` | The evidence gate, step by step, ending in the bundle |
 | Skill | `dv:vplan` | Map a file or a symptom to tests, covergroups and assertions |
 | Skill | `dv:why-fail` | Read-only root cause: rerun the seed, `wave-query` the failure, open the files |
+| Skill | `dv:triage` | Nightly regression triage: bucket failures by error signature, rerun on main, shrink the repro, one draft PR per new signature |
 | Skill | `dv:correct` | Turn a repeated review comment into a lint rule, assertion, hook or CI check |
 | Skill | `dv:create-verify-skill` | Generate a project-local verify skill for one IP (Launch, Doctor, Drive, Evidence, Cleanup, Helpers) |
 | Agent | `dv-verifier` | Clean-context rerun of the bundle: VERIFIED, NOT VERIFIED or INCONCLUSIVE |
-| Commands | `/dv-mode`, `/dv-verify`, `/dv-doctor` | Playbook router and entry points; skills are also callable as `/dv:verify`, `/dv:why-fail`, `/dv:correct` |
+| Agent | `dv-triager` | Unattended `dv:triage` for a scheduled job: draft PRs on `triage/` branches only |
+| Commands | `/dv-mode`, `/dv-verify`, `/dv-doctor` | Playbook router and entry points; skills are also callable as `/dv:verify`, `/dv:why-fail`, `/dv:triage`, `/dv:correct` |
 | Hooks | `no-weaken`, `door-check`, `lint-on-save`, `evidence-gate`, `session-doctor`, `human-relay` | The rules the agent cannot skip; `hooks/adapt.py` runs the same scripts under Cursor and Antigravity |
 | Rules | `dv-gate` | Always-on rule file for environments where hooks are weaker |
+
+### Regression triage
+
+`dv:triage` turns a regression's failures into error signatures (times, data values,
+line numbers and paths stripped) and shows a person only the new ones:
+
+```bash
+cd examples/fifo_block
+control-eda triage run --regress 3 --define FIFO_BUG_DOUBLE_POP
+```
+
+```
+TRIAGE: NEEDS_HUMAN  6 failures, 1 signatures (1 new, 0 regressed, 0 known, 0 fixed on origin/main)
+  new       89bddd416d  x6   main=same_commit   shrink=2000->3  action=draft_pr
+            %Error: fifo.sv:<l>: Assertion failed in tb_fifo.dut.a_ptr_count: 'assert' failed.
+```
+
+For each signature it reproduces one seed, reruns it on `main` in a temporary git
+worktree (a failure main already fixed is not shown), and bisects the
+`[triage].shrink_plusarg` (here `+cycles`) to the shortest run that fails the same
+way. `--logs 'nightly/*.log'` triages logs from any simulator with no simulator
+installed; the reruns then say `tool_missing` with an install hint.
+`control-eda triage record` marks a signature as owned by a PR, so the next night
+shows it as known. The store only changes what people see; the gate still fails on
+every failing seed.
 
 ## What is in the `formal` plugin
 

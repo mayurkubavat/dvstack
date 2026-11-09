@@ -40,6 +40,11 @@ steps are always `dv:verify` and a `dv-verifier` subagent run; never skip or reo
 4. `dv:verify`.
 5. Spawn `dv-verifier`.
 
+**Regression triage** (a nightly or CI regression has many failures)
+1. `dv:triage`: bucket by signature, recheck on main, shrink, one draft PR per new signature.
+2. Each draft PR is then a **Bug fix** goal of its own, started by a person.
+   (This playbook opens PRs but changes no RTL, so it ends without `dv:verify` and `dv-verifier`.)
+
 **Repeated review comment**
 1. `dv:correct`.
 

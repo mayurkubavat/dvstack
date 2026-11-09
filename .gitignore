@@ -18,6 +18,10 @@ obj_dir/
 **/evidence/.hook-probe
 **/evidence/hook-probe.jsonl
 
+# triage output is per-run; triage/signatures.json (the known-signature store) is committed
+**/triage/latest.json
+**/triage/report.md
+
 # python
 __pycache__/
 *.egg-info/
